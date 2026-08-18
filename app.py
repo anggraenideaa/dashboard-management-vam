@@ -20,7 +20,6 @@ if "logged_in" not in st.session_state:
 
 # --- KONDISI KETIKA BELUM LOGIN ---
 if not st.session_state.logged_in:
-    # Sembunyikan sidebar secara dinamis saat belum login
     st.markdown("""
         <style>
             [data-testid="stSidebar"] {
@@ -77,17 +76,19 @@ if not st.session_state.logged_in:
     st.stop() 
 
 # --- KONDISI KETIKA SUDAH BERHASIL LOGIN ---
-# Sidebar Menu & Informasi Akun
 st.sidebar.write(f"Halo, **{st.session_state.get('nama_sales', 'User')}**")
-st.sidebar.write(f"Role: **{str(st.session_state.get('role', 'sales')).capitalize()}**")
+user_role = str(st.session_state.get('role', 'sales')).lower()
+st.sidebar.write(f"Role: **{user_role.capitalize()}**")
 
 if st.sidebar.button("Logout", use_container_width=True):
     for key in list(st.session_state.keys()):
         del st.session_state[key]
+    st.session_state.logged_in = False
     st.rerun()
 
 st.sidebar.markdown("---")
 
+# --- SEMUA HALAMAN DIBUKA UNTUK SEMUA USER ---
 pages = [
     st.Page("pages/1_Sales_Performance.py", title="Sales Performance"),
     st.Page("pages/2_Sales_Per_Minggu.py", title="Sales Per Minggu"),

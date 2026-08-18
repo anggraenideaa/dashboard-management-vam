@@ -1,0 +1,158 @@
+/* --- Styling Global / Container --- */
+.block-container {
+    padding-top: 1.2rem !important;
+    padding-bottom: 2rem !important;
+}
+
+/* Judul Utama Dashboard */
+h1 {
+    font-size: 1.8rem !important;
+    font-weight: 700 !important;
+    color: #1E293B;
+    margin-bottom: 0px !important;
+}
+
+/* --- Helper Spacers (Pengganti Inline HTML) --- */
+.spacer-5 {
+    margin-bottom: 5px !important;
+}
+.spacer-10 {
+    margin-bottom: 10px !important;
+}
+.spacer-15 {
+    margin-bottom: 15px !important;
+}
+
+/* --- Styling untuk Metrik Card (Neumorphism / Soft Shadow) --- */
+div[data-testid="stMetric"] {
+    background-color: #ffffff;
+    border: 1px solid #f0f0f0;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 8px 8px 16px #e0e0e0, -8px -8px 16px #ffffff;
+    transition: all 0.4s ease;
+}
+div[data-testid="stMetric"]:hover {
+    transform: scale(1.02);
+    box-shadow: 12px 12px 24px #d1d1d1, -12px -12px 24px #ffffff;
+}
+div[data-testid="stMetricValue"] {
+    font-size: 1.5rem !important;
+    font-weight: 700;
+}
+
+/* --- EFEK TIMBUL & HOVER PADA CONTAINER GRAFIK & TABEL (border=True) --- */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 25px !important;
+    padding: 10px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08), 0 6px 12px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    transform: translateY(-8px) !important;
+    box-shadow: 0 22px 40px rgba(0, 0, 0, 0.14), 0 12px 18px rgba(0, 0, 0, 0.08) !important;
+    border-color: #cbd5e1 !important;
+}
+
+/* --- MENYAMAKAN FONT JUDUL DI DALAM CARD AGAR SERAGAM --- */
+div[data-testid="stVerticalBlockBorderWrapper"] h3, 
+div[data-testid="stVerticalBlockBorderWrapper"] h2 {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: #1E293B !important;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5rem !important;
+}
+
+/* --- CSS TABEL EYE-CATCHING --- */
+[data-testid="stDataFrame"] {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+}
+[data-testid="stDataFrame"] tr:hover {
+    background-color: #e8f5e9 !important;
+    transition: background-color 0.2s ease;
+}
+[data-testid="stDataFrame"] th {
+    background-color: #f1f3f4 !important;
+    font-weight: bold !important;
+}
+
+/* --- STYLING SIDEBAR & WARNA --- */
+[data-testid="stSidebar"] {
+    background-color: #f8fafc !important;
+    border-right: 1px solid #e2e8f0 !important;
+}
+
+/* --- STYLING MENU NAVIGASI SIDEBAR --- */
+[data-testid="stSidebarNav"] a {
+    border-radius: 10px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 4px !important;
+    transition: all 0.2s ease-in-out !important;
+}
+[data-testid="stSidebarNav"] a:hover {
+    background-color: #f1f5f9 !important;
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] span {
+    color: #ffffff !important;
+}
+
+/* --- STYLING HALAMAN UTAMA MENJADI PUTIH BERSIH --- */
+.stApp {
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+
+/* --- STYLING HALAMAN LOGIN (KEMBALI KE GRADIENT ELEGAN) --- */
+.login-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+}
+
+[data-testid="stForm"] {
+    background: #ffffff !important;
+    padding: 40px !important;
+    border-radius: 25px !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #f1f5f9 !important;
+    margin-top: 6vh !important;
+}
+
+/* Tombol Umum / Login */
+.stButton button {
+    background: #0f172a !important;
+    color: white !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    padding: 10px !important;
+    transition: all 0.3s ease;
+}
+
+.stButton button:hover {
+    background: #1e293b !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+/* Tombol khusus LOGOUT (Warna Merah) */
+button[kind="secondary"] {
+    background-color: #ef4444 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+}
+
+button[kind="secondary"]:hover {
+    background-color: #dc2626 !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+}

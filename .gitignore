@@ -1,0 +1,11 @@
+# Folder environment virtual (jika ada)
+venv/
+env/
+__pycache__/
+
+# Konfigurasi rahasia lokal (agar tidak bocor ke GitHub)
+.streamlit/secrets.toml
+
+# File sistem operasi
+.DS_Store
+Thumbs.db

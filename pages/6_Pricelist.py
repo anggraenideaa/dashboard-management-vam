@@ -44,7 +44,6 @@ else:
     hpp_col_opts = [c for c in df.columns if "hpp" in c.lower()]
     col_hpp = hpp_col_opts[0] if hpp_col_opts else None
 
-<<<<<<< HEAD
     # --- PERBAIKAN PEMBERSIHAN DATA HPP ---
     if col_hpp:
         # Hapus simbol mata uang, titik ribuan, atau spasi jika berbentuk string
@@ -58,8 +57,6 @@ else:
         # Filter hanya tampilkan HPP yang > 0
         df = df[df[col_hpp] > 0]
 
-=======
->>>>>>> 53ce97710f952468fa5886391fdea10d0260c47d
     with st.expander("🔍 Filter & Pencarian Pricelist", expanded=False):
         f_col1, f_col2 = st.columns(2)
         with f_col1:

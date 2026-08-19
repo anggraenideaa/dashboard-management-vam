@@ -44,6 +44,19 @@ else:
     hpp_col_opts = [c for c in df.columns if "hpp" in c.lower()]
     col_hpp = hpp_col_opts[0] if hpp_col_opts else None
 
+    # --- PERBAIKAN PEMBERSIHAN DATA HPP ---
+    if col_hpp:
+        # Hapus simbol mata uang, titik ribuan, atau spasi jika berbentuk string
+        df[col_hpp] = (
+            df[col_hpp]
+            .astype(str)
+            .str.replace(r"[Rp.,\s]", "", regex=True)  # Menghapus 'Rp', titik, koma, spasi
+            .str.replace(",", ".", regex=False)       # Jikalau ada format koma desimal
+        )
+        df[col_hpp] = pd.to_numeric(df[col_hpp], errors="coerce").fillna(0)
+        # Filter hanya tampilkan HPP yang > 0
+        df = df[df[col_hpp] > 0]
+
     with st.expander("🔍 Filter & Pencarian Pricelist", expanded=False):
         f_col1, f_col2 = st.columns(2)
         with f_col1:

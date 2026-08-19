@@ -49,8 +49,8 @@ else:
         df[col_tgl_inv] = pd.to_datetime(df[col_tgl_inv], errors="coerce")
         
         # Rentang tanggal mingguan default
-        start_date = pd.to_datetime("2026-08-01")
-        end_date = pd.to_datetime("2026-08-07")
+        start_date = pd.to_datetime("2026-08-08")
+        end_date = pd.to_datetime("2026-08-14")
         
         df = df[(df[col_tgl_inv] >= start_date) & (df[col_tgl_inv] <= end_date)]
     else:

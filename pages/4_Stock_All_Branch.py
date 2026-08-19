@@ -50,6 +50,13 @@ if df is not None and not df.empty:
     if col_stock_akhir in df.columns: df[col_stock_akhir] = clean_indo_numeric(df[col_stock_akhir])
     if col_kg_tabel in df.columns: df[col_kg_tabel] = clean_indo_numeric(df[col_kg_tabel])
 
+    # --- FILTER AGAR KATEGORI / GUDANG / PACKAGING 'SAMPLE' TIDAK DITAMPILKAN ---
+    # Mencari kolom yang potensial menunjukkan kategori atau gudang sampel
+    for col in df.columns:
+        if any(keyword in col.lower() for keyword in ["gudang", "kategori", "category", "packaging", "ket"]):
+            # Filter baris yang mengandung kata 'sample' (tidak case-sensitive)
+            df = df[~df[col].astype(str).str.lower().str.contains("sample", na=False)]
+
     df_display = df.copy()
 
     with st.expander("🔍 Filter Data Stock All Branch", expanded=False):

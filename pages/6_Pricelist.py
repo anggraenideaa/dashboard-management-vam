@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import re
 from db import load_hpp_pricelist
 
 st.set_page_config(page_title="Pricelist & HPP Barang", layout="wide")
@@ -44,17 +43,15 @@ else:
     hpp_col_opts = [c for c in df.columns if "hpp" in c.lower()]
     col_hpp = hpp_col_opts[0] if hpp_col_opts else None
 
-    # --- PERBAIKAN PEMBERSIHAN DATA HPP ---
+    # Pembersihan data HPP & Filter > 0
     if col_hpp:
-        # Hapus simbol mata uang, titik ribuan, atau spasi jika berbentuk string
         df[col_hpp] = (
             df[col_hpp]
             .astype(str)
-            .str.replace(r"[Rp.,\s]", "", regex=True)  # Menghapus 'Rp', titik, koma, spasi
-            .str.replace(",", ".", regex=False)       # Jikalau ada format koma desimal
+            .str.replace(r"[Rp.,\s]", "", regex=True) 
+            .str.replace(",", ".", regex=False)       
         )
         df[col_hpp] = pd.to_numeric(df[col_hpp], errors="coerce").fillna(0)
-        # Filter hanya tampilkan HPP yang > 0
         df = df[df[col_hpp] > 0]
 
     with st.expander("🔍 Filter & Pencarian Pricelist", expanded=False):
@@ -80,7 +77,11 @@ else:
     df_display["Item Name"] = df[col_item] if col_item in df.columns else "-"
     df_display["Pkg/Kg"] = df[col_pkgkg] if col_pkgkg and col_pkgkg in df.columns else "-"
     df_display["Kategori"] = df[col_kat] if col_kat and col_kat in df.columns else "-"
-    df_display["HPP"] = df[col_hpp] if col_hpp and col_hpp in df.columns else 0
+    
+    if col_hpp in df.columns:
+        df_display["HPP"] = df[col_hpp].apply(lambda x: format_id(x, decimal=2))
+    else:
+        df_display["HPP"] = "0,00"
 
     df_display.index = range(1, len(df_display) + 1)
 
@@ -88,4 +89,17 @@ else:
 
     with st.container(border=True):
         st.subheader("📋 Tabel Pricelist & HPP")
-        st.dataframe(df_display, use_container_width=True)
+        
+        # Menggunakan st.dataframe asli dengan pengaturan alignment yang presisi
+        st.dataframe(
+            df_display,
+            use_container_width=True,
+            hide_index=False,
+            column_config={
+                "_index": st.column_config.Column("No.", width="small", alignment="center"),
+                "Item Name": st.column_config.TextColumn("Item Name", width="medium", alignment="left"),
+                "Pkg/Kg": st.column_config.TextColumn("Pkg/Kg", width="small", alignment="center"),
+                "Kategori": st.column_config.TextColumn("Kategori", width="small", alignment="center"),
+                "HPP": st.column_config.TextColumn("HPP", width="small", alignment="right")
+            }
+        )

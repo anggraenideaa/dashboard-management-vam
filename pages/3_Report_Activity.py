@@ -51,12 +51,24 @@ else:
     if col_sales in df.columns:
         df[col_sales] = df[col_sales].fillna("UNCATEGORIZED").astype(str).str.strip().str.upper()
 
-    # Pembersihan Omzet & Berat
-    if col_omzet in df.columns:
-        df[col_omzet] = pd.to_numeric(df[col_omzet].astype(str).str.replace(r'[^0-9,.]', '', regex=True).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors="coerce").fillna(0)
-    else:
+    # --- PEMBERSIHAN OTOMATIS UNTUK UANG (OMZET & HARGA JUAL) ---
+    # Mencari semua kolom yang berkaitan dengan uang agar "Rp" terhapus secara otomatis
+    uang_columns = [col for col in df.columns if any(keyword in col.lower() for keyword in ['omzet', 'harga', 'jual', 'price', 'rp'])]
+    
+    for c in uang_columns:
+        # Menghapus huruf (termasuk Rp), spasi, dll. Hanya menyisakan angka, koma, dan titik.
+        df[c] = pd.to_numeric(
+            df[c].astype(str).str.replace(r'[^0-9,.]', '', regex=True)
+            .str.replace('.', '', regex=False)
+            .str.replace(',', '.', regex=False), 
+            errors="coerce"
+        ).fillna(0)
+
+    # Pastikan kolom omzet tidak error jika tidak ada di data awal
+    if col_omzet not in df.columns:
         df[col_omzet] = 0
 
+    # Pembersihan Berat (Kg)
     if col_berat in df.columns:
         df[col_berat] = pd.to_numeric(df[col_berat].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors="coerce").fillna(0)
     else:
@@ -74,7 +86,7 @@ else:
     with st.expander("🔍 Filter Data & Pencarian", expanded=False):
         f_col1, f_col2 = st.columns(2)
         
-        # FILTER SALES (Dibersihkan agar sinkron)
+        # FILTER SALES
         if col_sales in df.columns:
             all_sales = sorted([s for s in df[col_sales].unique() if s != "UNCATEGORIZED"])
             with f_col1:
@@ -98,11 +110,11 @@ else:
 
     st.caption(f"ℹ️ Total data dimuat: **{format_id(len(df), 0)} baris**")
     
-    # --- METRIK ---
+    # --- METRIK (Bebas dari tulisan Rp) ---
     total_deal_cust = df[df[col_status].astype(str).str.contains('trial order|5', case=False, na=False)].shape[0]
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Total Omzet", f"Rp {format_id(df[col_omzet].sum(), 2)}")
+    col1.metric("💰 Total Omzet", f"{format_id(df[col_omzet].sum(), 2)}")
     col2.metric("⚖️ Total Berat", f"{format_id(df[col_berat].sum(), 2)} Kg")
     col3.metric("👥 Total Prospek", f"{format_id(df[col_prospek].nunique(), 0)}")
     col4.metric("🎯 Deal (Trial Order)", f"{format_id(total_deal_cust, 0)} Cust")
@@ -111,9 +123,21 @@ else:
     with st.container(border=True):
         st.subheader("📋 Detail Prospek Customer")
         df_sorted = df.sort_values(by=col_omzet, ascending=False).reset_index(drop=True)
-        st.dataframe(df_sorted, use_container_width=True)
+        
+        # Format tampilan seluruh kolom uang & berat di dalam tabel agar menggunakan format angka Indonesia (2 desimal)
+        df_display = df_sorted.copy()
+        
+        # Terapkan format angka untuk SEMUA kolom uang (Omzet, Harga Jual, dll)
+        for c in uang_columns:
+            if c in df_display.columns:
+                df_display[c] = df_display[c].apply(lambda x: format_id(x, 2))
+                
+        if col_berat in df_display.columns:
+            df_display[col_berat] = df_display[col_berat].apply(lambda x: format_id(x, 2))
 
-    # --- GRAFIK PERKIRAAN OMZET PER BULAN (MENGGUNAKAN PLOTLY AGAR FORMAT ANGKA KONSISTEN) ---
+        st.dataframe(df_display, use_container_width=True)
+
+    # --- GRAFIK PERKIRAAN OMZET PER BULAN ---
     with st.container(border=True):
         st.subheader("📈 Perkiraan Omzet per Bulan")
         
@@ -132,16 +156,15 @@ else:
                 x='Bulan_Tahun', 
                 y=col_omzet, 
                 template="plotly_white",
-                labels={'Bulan_Tahun': 'Bulan / Periode', col_omzet: 'Perkiraan Omzet (Rp)'}
+                labels={'Bulan_Tahun': 'Bulan / Periode', col_omzet: 'Perkiraan Omzet'}
             )
-            # Format pemisah ribuan titik (.) dan desimal koma (,) ala Indonesia
             fig1.update_layout(
                 separators=',.',
-                yaxis=dict(tickformat=',.0f'),
+                yaxis=dict(tickformat=',.2f'),
                 margin=dict(l=20, r=20, t=30, b=20)
             )
             fig1.update_traces(
-                hovertemplate="<b>%{x}</b><br>Omzet: Rp %{y:,.0f}<extra></extra>"
+                hovertemplate="<b>%{x}</b><br>Omzet: %{y:,.2f}<extra></extra>"
             )
             st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
         else:
@@ -159,17 +182,16 @@ else:
             color=col_status, 
             barmode="group", 
             template="plotly_white",
-            labels={col_omzet: "Perkiraan Omzet (Rp)", col_sales: "Sales Name", col_status: "Status"}
+            labels={col_omzet: "Perkiraan Omzet", col_sales: "Sales Name", col_status: "Status"}
         )
         
-        # Format pemisah ribuan titik (.) dan desimal koma (,) ala Indonesia
         fig2.update_layout(
             separators=',.',
-            yaxis=dict(tickformat=',.0f'),
+            yaxis=dict(tickformat=',.2f'),
             margin=dict(l=20, r=20, t=30, b=20)
         )
         fig2.update_traces(
-            hovertemplate="<b>%{x}</b><br>Omzet: Rp %{y:,.0f}<extra></extra>"
+            hovertemplate="<b>%{x}</b><br>Omzet: %{y:,.2f}<extra></extra>"
         )
         
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})

@@ -100,6 +100,20 @@ if df is not None and not df.empty:
         available_cols = [c for c in cols_to_show if c in df_display.columns]
         df_final = df_display[available_cols].sort_values(by=col_branch).reset_index(drop=True)
         df_final.index = df_final.index + 1
-        st.dataframe(df_final, use_container_width=True)
+        
+        # Render tabel dengan st.dataframe dan column_config alignment
+        st.dataframe(
+            df_final, 
+            use_container_width=True,
+            hide_index=False,
+            column_config={
+                "_index": st.column_config.Column("No.", width="small", alignment="center"),
+                col_branch: st.column_config.TextColumn(col_branch, width="small", alignment="center"),
+                col_item: st.column_config.TextColumn(col_item, width="large", alignment="left"),
+                col_packaging: st.column_config.TextColumn(col_packaging, width="small", alignment="center"),
+                col_kg_tabel: st.column_config.NumberColumn(col_kg_tabel, width="small", alignment="center"),
+                col_stock_akhir: st.column_config.NumberColumn(col_stock_akhir, width="small", alignment="center")
+            }
+        )
 else:
     st.warning("Data Stock belum tersedia atau gagal dimuat.")

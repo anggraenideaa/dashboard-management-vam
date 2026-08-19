@@ -67,19 +67,37 @@ div[data-testid="stVerticalBlockBorderWrapper"] h2 {
     margin-bottom: 0.5rem !important;
 }
 
-/* --- CSS TABEL EYE-CATCHING --- */
+/* --- CSS TABEL BAWAAN STREAMLIT (st.dataframe) --- */
 [data-testid="stDataFrame"] {
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 8px 16px rgba(0,0,0,0.05);
 }
+
 [data-testid="stDataFrame"] tr:hover {
     background-color: #e8f5e9 !important;
     transition: background-color 0.2s ease;
 }
-[data-testid="stDataFrame"] th {
-    background-color: #f1f3f4 !important;
-    font-weight: bold !important;
+
+/* --- MEMAKSA HEADER TABEL AGAR BENAR-BENAR DI TENGAH (CENTER) --- */
+[data-testid="stDataFrame"] [data-testid="column-header"],
+[data-testid="stDataFrame"] th,
+[data-testid="stDataFrame"] [role="columnheader"] {
+    text-align: center !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+[data-testid="stDataFrame"] [data-testid="column-header"] > div,
+[data-testid="stDataFrame"] th > div {
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
+[data-testid="stDataFrame"] span {
+    text-align: center !important;
+    width: 100% !important;
 }
 
 /* --- STYLING SIDEBAR & WARNA --- */
@@ -114,7 +132,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] h2 {
     background-image: none !important;
 }
 
-/* --- STYLING HALAMAN LOGIN (KEMBALI KE GRADIENT ELEGAN) --- */
+/* --- STYLING HALAMAN LOGIN --- */
 .login-container {
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
 }

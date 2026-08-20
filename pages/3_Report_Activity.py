@@ -5,7 +5,7 @@ from db import load_report_activity, check_role_access
 
 st.set_page_config(page_title="Report Activity", layout="wide")
 
-# --- FUNGSI CSS ---
+# --- FUNGSI CSS (Memuat dari file terpusat assets/style.css) ---
 def load_css(file_name):
     try:
         with open(file_name) as f:
@@ -47,22 +47,21 @@ else:
     col_status = "Status"
     col_visit = "Visit_Terakhir"
 
+    # Deteksi kolom produk yang ditawarkan secara fleksibel
+    prod_col_opts = [c for c in df.columns if any(k in c.lower() for k in ['produk', 'item', 'barang', 'offering'])]
+    col_produk = prod_col_opts[0] if prod_col_opts else None
+
     # Pembersihan Sales Name (Penting untuk filter)
     if col_sales in df.columns:
         df[col_sales] = df[col_sales].fillna("UNCATEGORIZED").astype(str).str.strip().str.upper()
 
     # --- PEMBERSIHAN OTOMATIS UNTUK UANG (OMZET & HARGA JUAL) ---
-    # Mencari semua kolom yang berkaitan dengan uang agar "Rp" terhapus secara otomatis
     uang_columns = [col for col in df.columns if any(keyword in col.lower() for keyword in ['omzet', 'harga', 'jual', 'price', 'rp'])]
     
     for c in uang_columns:
-        # Menghapus huruf (termasuk Rp), spasi, dll. Hanya menyisakan angka, koma, dan titik.
-        df[c] = pd.to_numeric(
-            df[c].astype(str).str.replace(r'[^0-9,.]', '', regex=True)
-            .str.replace('.', '', regex=False)
-            .str.replace(',', '.', regex=False), 
-            errors="coerce"
-        ).fillna(0)
+        cleaned_series = df[c].astype(str).str.replace("Rp", "", case=False, regex=True).str.strip()
+        cleaned_series = cleaned_series.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+        df[c] = pd.to_numeric(cleaned_series, errors="coerce").fillna(0)
 
     # Pastikan kolom omzet tidak error jika tidak ada di data awal
     if col_omzet not in df.columns:
@@ -74,6 +73,7 @@ else:
     else:
         df[col_berat] = 0
 
+    # Ubah ke datetime
     df[col_visit] = pd.to_datetime(df[col_visit], errors="coerce")
     df[col_status] = df[col_status].fillna("Unknown").astype(str).str.strip()
 
@@ -110,7 +110,7 @@ else:
 
     st.caption(f"ℹ️ Total data dimuat: **{format_id(len(df), 0)} baris**")
     
-    # --- METRIK (Bebas dari tulisan Rp) ---
+    # --- METRIK ---
     total_deal_cust = df[df[col_status].astype(str).str.contains('trial order|5', case=False, na=False)].shape[0]
 
     col1, col2, col3, col4 = st.columns(4)
@@ -124,18 +124,40 @@ else:
         st.subheader("📋 Detail Prospek Customer")
         df_sorted = df.sort_values(by=col_omzet, ascending=False).reset_index(drop=True)
         
-        # Format tampilan seluruh kolom uang & berat di dalam tabel agar menggunakan format angka Indonesia (2 desimal)
-        df_display = df_sorted.copy()
+        df_display = pd.DataFrame()
+        df_display["Sales Name"] = df_sorted[col_sales] if col_sales in df_sorted.columns else "-"
+        df_display["Nama Customer"] = df_sorted[col_prospek] if col_prospek in df_sorted.columns else "-"
+        df_display["Produk Yang Ditawarkan"] = df_sorted[col_produk] if col_produk and col_produk in df_sorted.columns else "-"
+        df_display["Status"] = df_sorted[col_status] if col_status in df_sorted.columns else "-"
         
-        # Terapkan format angka untuk SEMUA kolom uang (Omzet, Harga Jual, dll)
-        for c in uang_columns:
-            if c in df_display.columns:
-                df_display[c] = df_display[c].apply(lambda x: format_id(x, 2))
-                
-        if col_berat in df_display.columns:
-            df_display[col_berat] = df_display[col_berat].apply(lambda x: format_id(x, 2))
+        # Format Visit Terakhir menjadi Date saja (YYYY-MM-DD)
+        if col_visit in df_sorted.columns:
+            df_display["Visit Terakhir"] = pd.to_datetime(df_sorted[col_visit], errors='coerce').dt.strftime('%Y-%m-%d').fillna('-')
+        else:
+            df_display["Visit Terakhir"] = "-"
+            
+        # Format Perkiraan Omzet menggunakan format ID
+        if col_omzet in df_sorted.columns:
+            df_display["Perkiraan Omzet"] = df_sorted[col_omzet].apply(lambda x: format_id(x, 2))
+        else:
+            df_display["Perkiraan Omzet"] = "0,00"
 
-        st.dataframe(df_display, use_container_width=True)
+        df_display.index = range(1, len(df_display) + 1)
+
+        st.dataframe(
+            df_display, 
+            use_container_width=True,
+            hide_index=False,
+            column_config={
+                "_index": st.column_config.Column("No.", width="small", alignment="center"),
+                "Sales Name": st.column_config.TextColumn("Sales Name", width="medium", alignment="center"),
+                "Nama Customer": st.column_config.TextColumn("Nama Customer", width="large", alignment="left"),
+                "Produk Yang Ditawarkan": st.column_config.TextColumn("Produk Yang Ditawarkan", width="large", alignment="left"),
+                "Status": st.column_config.TextColumn("Status", width="medium", alignment="center"),
+                "Visit Terakhir": st.column_config.TextColumn("Visit Terakhir", width="medium", alignment="center"),
+                "Perkiraan Omzet": st.column_config.TextColumn("Perkiraan Omzet", width="medium", alignment="right")
+            }
+        )
 
     # --- GRAFIK PERKIRAAN OMZET PER BULAN ---
     with st.container(border=True):

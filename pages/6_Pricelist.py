@@ -42,15 +42,17 @@ else:
     hpp_col_opts = [c for c in df.columns if "hpp" in c.lower()]
     col_hpp = hpp_col_opts[0] if hpp_col_opts else None
 
-    # Pembersihan data HPP & Filter > 0
+    # --- PEMBERSIHAN DATA HPP YANG BENAR ---
     if col_hpp:
-        df[col_hpp] = (
-            df[col_hpp]
-            .astype(str)
-            .str.replace(r"[Rp.,\s]", "", regex=True) 
-            .str.replace(",", ".", regex=False)       
-        )
-        df[col_hpp] = pd.to_numeric(df[col_hpp], errors="coerce").fillna(0)
+        # 1. Ubah ke string dan hapus teks "Rp" serta spasi
+        cleaned_series = df[col_hpp].astype(str).str.replace("Rp", "", case=False, regex=True).str.strip()
+        
+        # 2. Jika formatnya Indonesia (misal: 15.000,50), titik ribuan dibuang, koma diubah jadi titik desimal
+        # Cek apakah menggunakan koma sebagai desimal
+        cleaned_series = cleaned_series.str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+        
+        # 3. Konversi ke numeric
+        df[col_hpp] = pd.to_numeric(cleaned_series, errors="coerce").fillna(0)
         df = df[df[col_hpp] > 0]
 
     with st.expander("🔍 Filter & Pencarian Pricelist", expanded=False):
@@ -72,7 +74,6 @@ else:
     st.markdown("<div class='spacer-5'></div>", unsafe_allow_html=True)
     st.caption(f"ℹ️ Total produk ditemukan: **{format_id(len(df), 0)} baris**")
 
-    # Kolom Pkg/Kg sudah dihapus sesuai permintaan
     df_display = pd.DataFrame()
     df_display["Item Name"] = df[col_item] if col_item in df.columns else "-"
     df_display["Kategori"] = df[col_kat] if col_kat and col_kat in df.columns else "-"
@@ -89,7 +90,6 @@ else:
     with st.container(border=True):
         st.subheader("📋 Tabel Pricelist & HPP")
         
-        # Menggunakan st.dataframe tanpa kolom Pkg/Kg
         st.dataframe(
             df_display,
             use_container_width=True,

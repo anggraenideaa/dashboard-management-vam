@@ -37,7 +37,6 @@ else:
     df.columns = df.columns.astype(str).str.strip()
 
     col_item = "Item_Name" if "Item_Name" in df.columns else df.columns[0]
-    col_pkgkg = "PkgKg" if "PkgKg" in df.columns else None
     cat_col_opts = [c for c in df.columns if "kategori" in c.lower() or "cat" in c.lower()]
     col_kat = cat_col_opts[0] if cat_col_opts else None
     hpp_col_opts = [c for c in df.columns if "hpp" in c.lower()]
@@ -73,9 +72,9 @@ else:
     st.markdown("<div class='spacer-5'></div>", unsafe_allow_html=True)
     st.caption(f"ℹ️ Total produk ditemukan: **{format_id(len(df), 0)} baris**")
 
+    # Kolom Pkg/Kg sudah dihapus sesuai permintaan
     df_display = pd.DataFrame()
     df_display["Item Name"] = df[col_item] if col_item in df.columns else "-"
-    df_display["Pkg/Kg"] = df[col_pkgkg] if col_pkgkg and col_pkgkg in df.columns else "-"
     df_display["Kategori"] = df[col_kat] if col_kat and col_kat in df.columns else "-"
     
     if col_hpp in df.columns:
@@ -90,16 +89,15 @@ else:
     with st.container(border=True):
         st.subheader("📋 Tabel Pricelist & HPP")
         
-        # Menggunakan st.dataframe asli dengan pengaturan alignment yang presisi
+        # Menggunakan st.dataframe tanpa kolom Pkg/Kg
         st.dataframe(
             df_display,
             use_container_width=True,
             hide_index=False,
             column_config={
                 "_index": st.column_config.Column("No.", width="small", alignment="center"),
-                "Item Name": st.column_config.TextColumn("Item Name", width="medium", alignment="left"),
-                "Pkg/Kg": st.column_config.TextColumn("Pkg/Kg", width="small", alignment="center"),
-                "Kategori": st.column_config.TextColumn("Kategori", width="small", alignment="center"),
+                "Item Name": st.column_config.TextColumn("Item Name", width="large", alignment="left"),
+                "Kategori": st.column_config.TextColumn("Kategori", width="medium", alignment="center"),
                 "HPP": st.column_config.TextColumn("HPP", width="small", alignment="right")
             }
         )

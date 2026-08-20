@@ -40,6 +40,10 @@ if df is not None and not df.empty:
     col_gudang = "GUDANG"
     col_packaging = "PACKAGING"
     
+    # Deteksi kolom kategori secara fleksibel
+    cat_col_opts = [c for c in df.columns if "kategori" in c.lower() or "cat" in c.lower()]
+    col_kat = cat_col_opts[0] if cat_col_opts else None
+    
     def clean_indo_numeric(series):
         return pd.to_numeric(
             series.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False).str.strip(),
@@ -50,11 +54,18 @@ if df is not None and not df.empty:
     if col_stock_akhir in df.columns: df[col_stock_akhir] = clean_indo_numeric(df[col_stock_akhir])
     if col_kg_tabel in df.columns: df[col_kg_tabel] = clean_indo_numeric(df[col_kg_tabel])
 
+    # --- KECUALIKAN PACKAGING BERISI "PD" ---
+    if col_packaging in df.columns:
+        df = df[~df[col_packaging].astype(str).str.upper().str.contains("PD", na=False)]
+
+    # --- KECUALIKAN KATEGORI YANG BERISI "SAMPLE" ---
+    if col_kat in df.columns:
+        df = df[~df[col_kat].astype(str).str.upper().str.contains("SAMPLE", na=False)]
+
     df_display = df.copy()
 
     with st.expander("🔍 Filter Data Stock All Branch", expanded=False):
-        f1, f2 = st.columns(2)
-        f3, f4 = st.columns(2)
+        f1, f2, f3, f4 = st.columns(4)
 
         if col_branch in df.columns:
             branch_options = sorted(df[col_branch].dropna().astype(str).unique().tolist())
@@ -96,12 +107,14 @@ if df is not None and not df.empty:
 
     with st.container(border=True):
         st.subheader("📋 Tabel Stok Barang")
+        
+        # Kolom kategori sengaja tidak dimasukkan ke dalam list agar tidak tampil di tabel
         cols_to_show = [col_branch, col_item, col_packaging, col_kg_tabel, col_stock_akhir]
         available_cols = [c for c in cols_to_show if c in df_display.columns]
         df_final = df_display[available_cols].sort_values(by=col_branch).reset_index(drop=True)
         df_final.index = df_final.index + 1
         
-        # Render tabel dengan st.dataframe dan column_config alignment
+        # Render tabel dengan st.dataframe
         st.dataframe(
             df_final, 
             use_container_width=True,

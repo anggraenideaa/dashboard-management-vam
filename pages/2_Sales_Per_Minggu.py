@@ -157,7 +157,7 @@ else:
                 if selected_periode:
                     df = df[df["Periode_Bulan"].isin(selected_periode)]
 
-        st.caption(f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 01-07 Agustus 2026): **{format_id(len(df), 0)} baris**")
+        st.caption(f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 08-14 Agustus 2026): **{format_id(len(df), 0)} baris**")
         st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
         # 5. KARTU METRIK UTAMA

@@ -52,15 +52,15 @@ else:
         df[col_tgl_inv] = pd.to_datetime(df[col_tgl_inv], errors="coerce")
         
         # Rentang tanggal mingguan default
-        start_date = pd.to_datetime("2026-08-08")
-        end_date = pd.to_datetime("2026-08-14")
+        start_date = pd.to_datetime("2026-08-15")
+        end_date = pd.to_datetime("2026-08-21")
         
         df = df[(df[col_tgl_inv] >= start_date) & (df[col_tgl_inv] <= end_date)]
     else:
         st.warning(f"Kolom tanggal invoice ('{col_tgl_inv}') tidak ditemukan pada data. Filter tanggal mingguan dilewati.")
 
     if df.empty:
-        st.warning("Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (08 Agustus 2026 - 14 Agustus 2026).")
+        st.warning("Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (15-21 Agustus 2026).")
     else:
         # 2. PEMBERSIHAN DATA NET SALES
         if "Net_Sales_Amnt_Excl_Ppn" in df.columns:
@@ -168,7 +168,7 @@ else:
                 if selected_periode:
                     df = df[df["Periode_Bulan"].isin(selected_periode)]
 
-        st.caption(f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 08-14 Agustus 2026): **{format_id(len(df), 0)} baris**")
+        st.caption(f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 15-21 Agustus 2026): **{format_id(len(df), 0)} baris**")
         st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
         # 5. KARTU METRIK UTAMA

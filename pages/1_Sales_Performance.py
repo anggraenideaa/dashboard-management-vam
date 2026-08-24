@@ -315,7 +315,6 @@ with header_col1:
 with header_col2:
     st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
     if df is not None and not df.empty:
-        # Data untuk Ringkasan Per Sales PDF
         df_t_bln = (
             df.groupby(["Sales_Name", "Periode_Bulan"])["Target"]
             .max()
@@ -390,6 +389,9 @@ with header_col2:
             df_ml["Kategori"] = df_ml["Kategori"].replace(
                 {"Target": "Target", "Net_Sales_Amnt_Excl_Ppn": "Net Sales"}
             )
+            df_ml["Formatted_Nominal"] = df_ml["Nominal"].apply(
+                lambda x: format_id(x, 2)
+            )
 
             fig_t = px.bar(
                 df_ml,
@@ -403,10 +405,13 @@ with header_col2:
                     "Net Sales": "#4D96FF",
                 },
                 template="plotly_white",
-                text="Nominal",
+                text="Formatted_Nominal",
+                custom_data=["Formatted_Nominal"],
             )
             fig_t.update_traces(
-                texttemplate="Rp %{text:,.0f}", textposition="outside"
+                texttemplate="Rp %{text}",
+                textposition="outside",
+                hovertemplate="Sales: %{x}<br>Kategori: %{legendgroup}<br>Nominal: Rp %{customdata[0]}<extra></extra>",
             )
 
             key_t = "🎯 Pencapaian Sales vs Target (Per Bulan)"
@@ -454,6 +459,9 @@ with header_col2:
                     (top_p[item_col_pdf] != "")
                     & (top_p[item_col_pdf].str.lower() != "nan")
                 ]
+                top_p["Formatted_Qty"] = top_p["Tot_Qty_Kg"].apply(
+                    lambda x: format_id(x, 2)
+                )
 
                 fig_p = px.bar(
                     top_p,
@@ -462,10 +470,13 @@ with header_col2:
                     template="plotly_white",
                     color="Tot_Qty_Kg",
                     color_continuous_scale="Viridis",
-                    text="Tot_Qty_Kg",
+                    text="Formatted_Qty",
+                    custom_data=["Formatted_Qty"],
                 )
                 fig_p.update_traces(
-                    texttemplate="%{text:,.2f} Kg", textposition="outside"
+                    texttemplate="%{text} Kg",
+                    textposition="outside",
+                    hovertemplate="Produk: %{x}<br>Total Qty: %{customdata[0]} Kg<extra></extra>",
                 )
                 fig_p.update_layout(coloraxis_showscale=False)
 
@@ -505,6 +516,9 @@ with header_col2:
                     (top_c["Cust_Name"] != "")
                     & (top_c["Cust_Name"].str.lower() != "nan")
                 ]
+                top_c["Formatted_Sales"] = top_c[
+                    "Net_Sales_Amnt_Excl_Ppn"
+                ].apply(lambda x: format_id(x, 2))
 
                 fig_c = px.bar(
                     top_c.sort_values(
@@ -516,10 +530,13 @@ with header_col2:
                     template="plotly_white",
                     color="Net_Sales_Amnt_Excl_Ppn",
                     color_continuous_scale="Tealgrn",
-                    text="Net_Sales_Amnt_Excl_Ppn",
+                    text="Formatted_Sales",
+                    custom_data=["Formatted_Sales"],
                 )
                 fig_c.update_traces(
-                    texttemplate="Rp %{text:,.0f}", textposition="outside"
+                    texttemplate="Rp %{text}",
+                    textposition="outside",
+                    hovertemplate="Customer: %{y}<br>Net Sales: Rp %{customdata[0]}<extra></extra>",
                 )
                 fig_c.update_layout(coloraxis_showscale=False)
 
@@ -551,6 +568,9 @@ with header_col2:
                 df_b["Branch"] = (
                     df_b["Branch"].fillna("UNCATEGORIZED").astype(str)
                 )
+                df_b["Formatted_Sales"] = df_b[
+                    "Net_Sales_Amnt_Excl_Ppn"
+                ].apply(lambda x: format_id(x, 2))
 
                 fig_b = px.pie(
                     df_b,
@@ -559,10 +579,12 @@ with header_col2:
                     hole=0.45,
                     template="plotly_white",
                     color_discrete_sequence=px.colors.qualitative.Prism,
+                    custom_data=["Formatted_Sales"],
                 )
                 fig_b.update_traces(
-                    textinfo="value+percent",
-                    texttemplate="Rp %{value:,.0f}<br>(%{percent})",
+                    textinfo="text+percent",
+                    texttemplate="Rp %{customdata[0]}<br>(%{percent})",
+                    hovertemplate="Branch: %{label}<br>Net Sales: Rp %{customdata[0]}<br>Persentase: %{percent}<extra></extra>",
                 )
 
                 key_b = "🏢 Total Penjualan per Cabang"
@@ -663,7 +685,9 @@ else:
     m1, m2, m3 = st.columns(3)
     m1.metric("💰 Net Sales Excl PPN", f"Rp {format_id(ns_dec, 2)}")
     m2.metric(f"📦 Total {cost_label}", f"Rp {format_id(cost_dec, 2)}")
-    m3.metric(f"📈 Net Margin {cost_label}", f"Rp {format_id(ns_dec - cost_dec, 2)}")
+    m3.metric(
+        f"📈 Net Margin {cost_label}", f"Rp {format_id(ns_dec - cost_dec, 2)}"
+    )
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
@@ -779,6 +803,9 @@ else:
         df_ml_web["Kategori"] = df_ml_web["Kategori"].replace(
             {"Target": "Target", "Net_Sales_Amnt_Excl_Ppn": "Net Sales"}
         )
+        df_ml_web["Formatted_Nominal"] = df_ml_web["Nominal"].apply(
+            lambda x: format_id(x, 2)
+        )
 
         fig_target = px.bar(
             df_ml_web,
@@ -789,10 +816,13 @@ else:
             category_orders={"Sales_Name": df_t_web["Sales_Name"].tolist()},
             color_discrete_map={"Target": "#FF6B6B", "Net Sales": "#4D96FF"},
             template="plotly_white",
-            text="Nominal",
+            text="Formatted_Nominal",
+            custom_data=["Formatted_Nominal"],
         )
         fig_target.update_traces(
-            texttemplate="Rp %{text:,.0f}", textposition="outside"
+            texttemplate="Rp %{text}",
+            textposition="outside",
+            hovertemplate="Sales: %{x}<br>Kategori: %{legendgroup}<br>Nominal: Rp %{customdata[0]}<extra></extra>",
         )
         fig_target.update_layout(
             legend=dict(orientation="h", y=1.15, x=0.5, xanchor="center"),
@@ -821,6 +851,10 @@ else:
                 .sort_values(by="Tot_Qty_Kg", ascending=False)
                 .head(10)
             )
+            tp_web["Formatted_Qty"] = tp_web["Tot_Qty_Kg"].apply(
+                lambda x: format_id(x, 2)
+            )
+
             fig_p = px.bar(
                 tp_web,
                 x=item_col_web,
@@ -828,10 +862,13 @@ else:
                 template="plotly_white",
                 color="Tot_Qty_Kg",
                 color_continuous_scale="Viridis",
-                text="Tot_Qty_Kg",
+                text="Formatted_Qty",
+                custom_data=["Formatted_Qty"],
             )
             fig_p.update_traces(
-                texttemplate="%{text:,.2f} Kg", textposition="outside"
+                texttemplate="%{text} Kg",
+                textposition="outside",
+                hovertemplate="Produk: %{x}<br>Total Qty: %{customdata[0]} Kg<extra></extra>",
             )
             fig_p.update_layout(
                 height=450,
@@ -856,6 +893,10 @@ else:
                 .head(10)
                 .sort_values(by="Net_Sales_Amnt_Excl_Ppn", ascending=True)
             )
+            tc_web["Formatted_Sales"] = tc_web["Net_Sales_Amnt_Excl_Ppn"].apply(
+                lambda x: format_id(x, 2)
+            )
+
             fig_c = px.bar(
                 tc_web,
                 x="Net_Sales_Amnt_Excl_Ppn",
@@ -864,10 +905,13 @@ else:
                 template="plotly_white",
                 color="Net_Sales_Amnt_Excl_Ppn",
                 color_continuous_scale="Tealgrn",
-                text="Net_Sales_Amnt_Excl_Ppn",
+                text="Formatted_Sales",
+                custom_data=["Formatted_Sales"],
             )
             fig_c.update_traces(
-                texttemplate="Rp %{text:,.0f}", textposition="outside"
+                texttemplate="Rp %{text}",
+                textposition="outside",
+                hovertemplate="Customer: %{y}<br>Net Sales: Rp %{customdata[0]}<extra></extra>",
             )
             fig_c.update_layout(
                 height=450,
@@ -890,6 +934,10 @@ else:
             .reset_index()
             .sort_values(by="Net_Sales_Amnt_Excl_Ppn", ascending=False)
         )
+        df_b_web["Formatted_Sales"] = df_b_web["Net_Sales_Amnt_Excl_Ppn"].apply(
+            lambda x: format_id(x, 2)
+        )
+
         fig_b = px.pie(
             df_b_web,
             names="Branch",
@@ -897,10 +945,12 @@ else:
             hole=0.45,
             template="plotly_white",
             color_discrete_sequence=px.colors.qualitative.Prism,
+            custom_data=["Formatted_Sales"],
         )
         fig_b.update_traces(
-            textinfo="value+percent",
-            texttemplate="Rp %{value:,.0f}<br>(%{percent})",
+            textinfo="text+percent",
+            texttemplate="Rp %{customdata[0]}<br>(%{percent})",
+            hovertemplate="Branch: %{label}<br>Net Sales: Rp %{customdata[0]}<br>Persentase: %{percent}<extra></extra>",
         )
         fig_b.update_layout(
             legend=dict(orientation="h", y=-0.1, x=0.5, xanchor="center")

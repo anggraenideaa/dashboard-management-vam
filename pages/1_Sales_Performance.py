@@ -96,7 +96,17 @@ else:
     else:
         df["Periode_Bulan"] = "Unknown"
 
-    df["Net_Margin_COGM"] = (df["Net_Sales_Amnt_Excl_Ppn"] - df["Total_COGM"]).round(2)
+    # --- TENTUKAN KOLOM BIAYA UTAMA (UNTUK KARTU METRIK) BERDASARKAN ROLE ---
+    user_role = str(st.session_state.get("role", "sales")).lower()
+    
+    if user_role in ["admin", "direksi"]:
+        active_cost_col = "Total_COGM"
+        cost_label = "COGM"
+    else: # sales
+        active_cost_col = "Total_COGS"
+        cost_label = "COGS"
+
+    df[f"Net_Margin_{cost_label}"] = (df["Net_Sales_Amnt_Excl_Ppn"] - df[active_cost_col]).round(2)
 
     with st.expander("🔍 Filter Data Dashboard", expanded=False):
         f_col1, f_col2 = st.columns(2)
@@ -108,7 +118,6 @@ else:
             if selected_branches:
                 df = df[df["Branch"].isin(selected_branches)]
 
-        user_role = str(st.session_state.get("role", "sales")).lower()
         if "Sales_Name" in df.columns and user_role in ["admin", "direksi"]:
             all_sales = sorted(df["Sales_Name"].dropna().unique().tolist())
             with f_col2:
@@ -126,7 +135,6 @@ else:
                 df = df[df["Cust_Name"].isin(selected_cust)]
                 
         if "Periode_Bulan" in df.columns:
-            # Mengurutkan periode secara descending (terkini/terbaru berada di atas)
             all_periode = sorted(df["Periode_Bulan"].dropna().unique().tolist(), reverse=True)
             with f_col4:
                 selected_periode = st.multiselect("Filter Periode:", options=all_periode, default=[], placeholder="Pilih Periode...")
@@ -135,20 +143,20 @@ else:
 
     st.caption(f"ℹ️ Total baris data dimuat (setelah filter): **{format_id(len(df), 0)} baris**")
     
-    # PERINGATAN TAMBAHAN JIKA DATA SALES KOSONG
     if len(df) == 0 and user_role == "sales":
         st.warning(f"⚠️ Data untuk sales **{st.session_state.get('nama_sales', '')}** tidak ditemukan. Pastikan penulisan nama di database user dan kolom 'Sales_Name' pada Google Sheets sudah sama persis.")
 
     st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
     total_net_sales = df["Net_Sales_Amnt_Excl_Ppn"].sum()
-    total_cogm = df["Total_COGM"].sum()
-    total_net_margin_cogm = df["Net_Margin_COGM"].sum()
+    total_cost = df[active_cost_col].sum()
+    total_net_margin = df[f"Net_Margin_{cost_label}"].sum()
 
+    # Metrik Utama Dinamis (COGM untuk Admin/Direksi, COGS untuk Sales)
     m1, m2, m3 = st.columns(3)
     m1.metric("💰 Net Sales Excl PPN", f"Rp {format_id(total_net_sales, 2)}")
-    m2.metric("📦 Total COGM", f"Rp {format_id(total_cogm, 2)}")
-    m3.metric("📈 Net Margin COGM", f"Rp {format_id(total_net_margin_cogm, 2)}")
+    m2.metric(f"📦 Total {cost_label}", f"Rp {format_id(total_cost, 2)}")
+    m3.metric(f"📈 Net Margin {cost_label}", f"Rp {format_id(total_net_margin, 2)}")
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
@@ -163,28 +171,41 @@ else:
         }).reset_index()
 
         df_summary = pd.merge(df_sales_agg, df_total_target, on="Sales_Name", how="left").fillna(0)
-
-        df_summary["Gross_Margin_COGM"] = df_summary["Net_Sales_Amnt_Excl_Ppn"] - df_summary["Total_COGM"]
-        df_summary["Gross_Margin_COGS"] = df_summary["Net_Sales_Amnt_Excl_Ppn"] - df_summary["Total_COGS"]
-        
-        df_summary["Net_Margin_COGM (%)"] = df_summary.apply(
-            lambda row: ((row["Net_Sales_Amnt_Excl_Ppn"] - row["Total_COGM"]) / row["Net_Sales_Amnt_Excl_Ppn"] * 100) 
-            if row["Net_Sales_Amnt_Excl_Ppn"] != 0 else 0, axis=1
-        )
-        df_summary["Net_Margin_COGS (%)"] = df_summary.apply(
-            lambda row: ((row["Net_Sales_Amnt_Excl_Ppn"] - row["Total_COGS"]) / row["Net_Sales_Amnt_Excl_Ppn"] * 100) 
-            if row["Net_Sales_Amnt_Excl_Ppn"] != 0 else 0, axis=1
-        )
-
         df_summary = df_summary.sort_values(by="Net_Sales_Amnt_Excl_Ppn", ascending=False)
 
         df_display = pd.DataFrame()
         df_display["Sales Name"] = df_summary["Sales_Name"]
         df_display["Net Sales Amnt Excl Ppn"] = df_summary["Net_Sales_Amnt_Excl_Ppn"].apply(lambda x: f"Rp {format_id(x, 2)}")
-        df_display["Gross Margin COGM"] = df_summary["Gross_Margin_COGM"].apply(lambda x: f"Rp {format_id(x, 2)}")
+
+        column_config_dict = {
+            "Sales Name": st.column_config.TextColumn("Sales Name", width="medium", alignment="left"),
+            "Net Sales Amnt Excl Ppn": st.column_config.TextColumn("Net Sales Amnt Excl Ppn", alignment="right"),
+        }
+
+        # Jika Admin / Direksi, tampilkan kolom COGM & COGS sekaligus
+        if user_role in ["admin", "direksi"]:
+            df_summary["Gross_Margin_COGM"] = df_summary["Net_Sales_Amnt_Excl_Ppn"] - df_summary["Total_COGM"]
+            df_summary["Net_Margin_COGM (%)"] = df_summary.apply(
+                lambda row: ((row["Net_Sales_Amnt_Excl_Ppn"] - row["Total_COGM"]) / row["Net_Sales_Amnt_Excl_Ppn"] * 100) 
+                if row["Net_Sales_Amnt_Excl_Ppn"] != 0 else 0, axis=1
+            )
+            df_display["Gross Margin COGM"] = df_summary["Gross_Margin_COGM"].apply(lambda x: f"Rp {format_id(x, 2)}")
+            df_display["Net Margin COGM"] = df_summary["Net_Margin_COGM (%)"].apply(lambda x: f"{format_id(x, 2)}%")
+
+            column_config_dict["Gross Margin COGM"] = st.column_config.TextColumn("Gross Margin COGM", alignment="right")
+            column_config_dict["Net Margin COGM"] = st.column_config.TextColumn("Net Margin COGM", alignment="center")
+
+        # Kolom COGS ditampilkan untuk semua role (Admin, Direksi, & Sales)
+        df_summary["Gross_Margin_COGS"] = df_summary["Net_Sales_Amnt_Excl_Ppn"] - df_summary["Total_COGS"]
+        df_summary["Net_Margin_COGS (%)"] = df_summary.apply(
+            lambda row: ((row["Net_Sales_Amnt_Excl_Ppn"] - row["Total_COGS"]) / row["Net_Sales_Amnt_Excl_Ppn"] * 100) 
+            if row["Net_Sales_Amnt_Excl_Ppn"] != 0 else 0, axis=1
+        )
         df_display["Gross Margin COGS"] = df_summary["Gross_Margin_COGS"].apply(lambda x: f"Rp {format_id(x, 2)}")
-        df_display["Net Margin COGM"] = df_summary["Net_Margin_COGM (%)"].apply(lambda x: f"{format_id(x, 2)}%")
         df_display["Net Margin COGS"] = df_summary["Net_Margin_COGS (%)"].apply(lambda x: f"{format_id(x, 2)}%")
+
+        column_config_dict["Gross Margin COGS"] = st.column_config.TextColumn("Gross Margin COGS", alignment="right")
+        column_config_dict["Net Margin COGS"] = st.column_config.TextColumn("Net Margin COGS", alignment="center")
 
         df_display.index = range(1, len(df_display) + 1)
 
@@ -193,14 +214,7 @@ else:
             st.dataframe(
                 df_display, 
                 use_container_width=True,
-                column_config={
-                    "Sales Name": st.column_config.TextColumn("Sales Name", width="medium", alignment="left"),
-                    "Net Sales Amnt Excl Ppn": st.column_config.TextColumn("Net Sales Amnt Excl Ppn", alignment="right"),
-                    "Gross Margin COGM": st.column_config.TextColumn("Gross Margin COGM", alignment="right"),
-                    "Gross Margin COGS": st.column_config.TextColumn("Gross Margin COGS", alignment="right"),
-                    "Net Margin COGM": st.column_config.TextColumn("Net Margin COGM", alignment="center"),
-                    "Net Margin COGS": st.column_config.TextColumn("Net Margin COGS", alignment="center"),
-                }
+                column_config=column_config_dict
             )
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)

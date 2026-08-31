@@ -49,7 +49,7 @@ def format_id(val, decimal=2):
         return val
 
 
-LAST_UPDATE_DATE = "24 Agustus 2026"
+LAST_UPDATE_DATE = "31 Agustus 2026"
 
 
 def clean_to_decimal(val):

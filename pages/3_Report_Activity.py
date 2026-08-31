@@ -26,6 +26,14 @@ def format_id(val, decimal=2):
     except Exception:
         return val
 
+# Mapping nama bulan ke Bahasa Indonesia
+bulan_indo = {
+    'January': 'Januari', 'February': 'Februari', 'March': 'Maret', 
+    'April': 'April', 'May': 'Mei', 'June': 'Juni', 
+    'July': 'Juli', 'August': 'Agustus', 'September': 'September', 
+    'October': 'Oktober', 'November': 'November', 'December': 'Desember'
+}
+
 st.title("📝 Report Activity Dashboard")
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
@@ -168,7 +176,12 @@ else:
         
         df_chart_data = df.copy()
         if col_visit in df_chart_data.columns:
-            df_chart_data['Bulan_Tahun'] = df_chart_data[col_visit].dt.strftime('%B %Y').fillna("No Date")
+            # Format awal '%B %Y' (contoh: August 2026)
+            eng_date = df_chart_data[col_visit].dt.strftime('%B %Y').fillna("No Date")
+            # Terjemahkan nama bulan ke bahasa Indonesia
+            for eng, indo in bulan_indo.items():
+                eng_date = eng_date.str.replace(eng, indo, regex=False)
+            df_chart_data['Bulan_Tahun'] = eng_date
         else:
             df_chart_data['Bulan_Tahun'] = "No Date"
             

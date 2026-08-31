@@ -176,9 +176,7 @@ else:
         
         df_chart_data = df.copy()
         if col_visit in df_chart_data.columns:
-            # Format awal '%B %Y' (contoh: August 2026)
             eng_date = df_chart_data[col_visit].dt.strftime('%B %Y').fillna("No Date")
-            # Terjemahkan nama bulan ke bahasa Indonesia
             for eng, indo in bulan_indo.items():
                 eng_date = eng_date.str.replace(eng, indo, regex=False)
             df_chart_data['Bulan_Tahun'] = eng_date
@@ -208,7 +206,7 @@ else:
                 ),
                 margin=dict(l=20, r=20, t=20, b=40),
                 height=350,
-                xaxis=dict(tickangle=-25)
+                xaxis=dict(tickangle=25)  # Diubah menjadi positif (25) agar miring ke kanan
             )
             fig1.update_traces(
                 marker_color='#4C78A8',
@@ -235,6 +233,21 @@ else:
         
         max_y2 = df_status[col_omzet].max() * 1.1 if not df_status.empty else 10
 
+        unique_sales_list = df_status[col_sales].unique().tolist()
+        shapes_list = []
+        for i in range(len(unique_sales_list) - 1):
+            shapes_list.append(
+                dict(
+                    type="line",
+                    x0=i + 0.5,
+                    x1=i + 0.5,
+                    y0=0,
+                    y1=1,
+                    yref="paper",
+                    line=dict(color="#D3D3D3", width=1.5, dash="dash")
+                )
+            )
+
         fig2.update_layout(
             separators=',.',
             yaxis=dict(
@@ -244,6 +257,9 @@ else:
             ),
             margin=dict(l=20, r=20, t=20, b=80),
             height=420,
+            bargroupgap=0.08,
+            bargap=0.3,
+            shapes=shapes_list,
             legend=dict(
                 orientation="h",
                 yanchor="top",

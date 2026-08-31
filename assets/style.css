@@ -238,3 +238,10 @@ button[kind="secondary"]:hover {
         padding: 8px 10px !important;
     }
 }
+
+[data-testid="stDataFrame"] div[data-testid="stTable"] {
+    width: 100% !important;
+}
+[data-testid="stDataFrame"] iframe {
+    width: 100% !important;
+}

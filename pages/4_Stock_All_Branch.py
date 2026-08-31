@@ -108,25 +108,43 @@ if df is not None and not df.empty:
     with st.container(border=True):
         st.subheader("📋 Tabel Stok Barang")
         
-        # Kolom kategori sengaja tidak dimasukkan ke dalam list agar tidak tampil di tabel
         cols_to_show = [col_branch, col_item, col_packaging, col_kg_tabel, col_stock_akhir]
         available_cols = [c for c in cols_to_show if c in df_display.columns]
         df_final = df_display[available_cols].sort_values(by=col_branch).reset_index(drop=True)
         df_final.index = df_final.index + 1
         
-        # Render tabel dengan st.dataframe
-        st.dataframe(
-            df_final, 
-            use_container_width=True,
-            hide_index=False,
-            column_config={
-                "_index": st.column_config.Column("No.", width="small", alignment="center"),
-                col_branch: st.column_config.TextColumn(col_branch, width="small", alignment="center"),
-                col_item: st.column_config.TextColumn(col_item, width="large", alignment="left"),
-                col_packaging: st.column_config.TextColumn(col_packaging, width="small", alignment="center"),
-                col_kg_tabel: st.column_config.NumberColumn(col_kg_tabel, width="small", alignment="center"),
-                col_stock_akhir: st.column_config.NumberColumn(col_stock_akhir, width="small", alignment="center")
-            }
-        )
+        # Render HTML Table dengan Sticky Header (atas) dan Sticky Column (kiri untuk kolom No.)
+        html_table = """
+        <div style='max-height: 450px; overflow-y: auto; overflow-x: auto; border: 1px solid #d6d6d6; border-radius: 8px; margin-bottom: 15px;'>
+            <table style='width: 100%; border-collapse: collapse; font-size: 13px; background-color: white;'>
+                <thead>
+                    <tr style='background-color: #f8f9fb; color: #31333F;'>
+                        <th style='position: sticky; top: 0; left: 0; z-index: 3; background-color: #f8f9fb; padding: 10px; border: 1px solid #d6d6d6; text-align: center; min-width: 50px;'>No.</th>
+        """
+        
+        for col in available_cols:
+            html_table += f"<th style='position: sticky; top: 0; z-index: 2; background-color: #f8f9fb; padding: 10px; border: 1px solid #d6d6d6; text-align: center;'>{col}</th>"
+        
+        html_table += "</tr></thead><tbody>"
+        
+        for idx, row in df_final.iterrows():
+            # Kolom "No." diset sticky ke kiri (left: 0) dengan z-index agar tidak tertutup kolom lain saat digeser
+            html_table += f"<tr><td style='position: sticky; left: 0; z-index: 1; background-color: #ffffff; padding: 8px; border: 1px solid #d6d6d6; text-align: center; color: #31333F;'>{idx}</td>"
+            for col in available_cols:
+                val = row[col]
+                if col in [col_kg_tabel, col_stock_akhir]:
+                    val = format_id(val, 2)
+                    align = "right"
+                elif col in [col_branch, col_packaging]:
+                    align = "center"
+                else:
+                    align = "left"
+                    
+                html_table += f"<td style='padding: 8px; border: 1px solid #d6d6d6; text-align: {align}; color: #31333F;'>{val}</td>"
+            html_table += "</tr>"
+            
+        html_table += "</tbody></table></div>"
+        
+        st.markdown(html_table, unsafe_allow_html=True)
 else:
     st.warning("Data Stock belum tersedia atau gagal dimuat.")

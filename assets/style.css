@@ -245,3 +245,16 @@ button[kind="secondary"]:hover {
 [data-testid="stDataFrame"] iframe {
     width: 100% !important;
 }
+
+/* Membuat container dan card lebih ramah mobile */
+@media (max-width: 768px) {
+    /* Mengubah multi-kolom agar bertumpuk di HP */
+    .row-widget.stHorizontal {
+        flex-direction: column;
+    }
+    /* Mengatur padding dashboard agar tidak terlalu mepet */
+    .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}

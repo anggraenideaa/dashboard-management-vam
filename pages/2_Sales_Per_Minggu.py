@@ -8,7 +8,7 @@ import streamlit as st
 st.set_page_config(page_title="Sales Performance Dashboard", layout="wide")
 
 
-# Fungsi untuk memuat file CSS eksternal (terpusat)
+# Fungsi untuk memuat file CSS eksternal (terpusat) & CSS Responsif Tabel
 def load_css(file_name):
     try:
         with open(file_name) as f:
@@ -20,6 +20,21 @@ def load_css(file_name):
 
 
 load_css("assets/style.css")
+
+# CSS tambahan untuk memaksa responsivitas mobile
+st.markdown(
+    """
+    <style>
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 0.8rem;
+            padding-right: 0.8rem;
+        }
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
 
 
 # Fungsi untuk memformat angka ke standar Indonesia (titik=ribuan, koma=desimal, 2 digit desimal)
@@ -274,7 +289,7 @@ else:
             "<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True
         )
 
-        # 6. TABEL RINGKASAN PERFORMA PER SALES
+        # 6. TABEL RINGKASAN PERFORMA PER SALES (RESPONSIF / NOWRAP MENGGUNAKAN HTML NATIVE)
         if "Sales_Name" in df.columns and not df.empty:
             df_target_per_bulan = (
                 df.groupby(["Sales_Name", "Periode_Bulan"])["Target"]
@@ -306,21 +321,6 @@ else:
                 by="Net_Sales_Amnt_Excl_Ppn", ascending=False
             )
 
-            df_display = pd.DataFrame()
-            df_display["Sales Name"] = df_summary["Sales_Name"]
-            df_display["Net Sales Amnt Excl Ppn"] = df_summary[
-                "Net_Sales_Amnt_Excl_Ppn"
-            ].apply(lambda x: f"Rp {format_id(x, 2)}")
-
-            column_config_dict = {
-                "Sales Name": st.column_config.TextColumn(
-                    "Sales Name", width="medium", alignment="left"
-                ),
-                "Net Sales Amnt Excl Ppn": st.column_config.TextColumn(
-                    "Net Sales Amnt Excl Ppn", alignment="right"
-                ),
-            }
-
             if user_role in ["admin", "direksi"]:
                 df_summary["Gross_Margin_COGM"] = (
                     df_summary["Net_Sales_Amnt_Excl_Ppn"]
@@ -339,23 +339,6 @@ else:
                     else 0,
                     axis=1,
                 )
-                df_display["Gross Margin COGM"] = df_summary[
-                    "Gross_Margin_COGM"
-                ].apply(lambda x: f"Rp {format_id(x, 2)}")
-                df_display["Net Margin COGM"] = df_summary[
-                    "Net_Margin_COGM (%)"
-                ].apply(lambda x: f"{format_id(x, 2)}%")
-
-                column_config_dict["Gross Margin COGM"] = (
-                    st.column_config.TextColumn(
-                        "Gross Margin COGM", alignment="right"
-                    )
-                )
-                column_config_dict["Net Margin COGM"] = (
-                    st.column_config.TextColumn(
-                        "Net Margin COGM", alignment="center"
-                    )
-                )
 
             df_summary["Gross_Margin_COGS"] = (
                 df_summary["Net_Sales_Amnt_Excl_Ppn"] - df_summary["Total_COGS"]
@@ -370,37 +353,90 @@ else:
                 else 0,
                 axis=1,
             )
-            df_display["Gross Margin COGS"] = df_summary[
-                "Gross_Margin_COGS"
-            ].apply(lambda x: f"Rp {format_id(x, 2)}")
-            df_display["Net Margin COGS"] = df_summary[
-                "Net_Margin_COGS (%)"
-            ].apply(lambda x: f"{format_id(x, 2)}%")
 
-            column_config_dict["Gross Margin COGS"] = (
-                st.column_config.TextColumn(
-                    "Gross Margin COGS", alignment="right"
-                )
-            )
-            column_config_dict["Net Margin COGS"] = st.column_config.TextColumn(
-                "Net Margin COGS", alignment="center"
-            )
+            # Buat baris data tabel secara aman
+            rows_list = []
+            for idx, row in enumerate(df_summary.iterrows(), start=1):
+                r = row[1]
+                s_name = str(r["Sales_Name"])
+                net_sales = f"Rp {format_id(r['Net_Sales_Amnt_Excl_Ppn'], 2)}"
 
-            df_display.index = range(1, len(df_display) + 1)
+                extra_tds = ""
+                if user_role in ["admin", "direksi"]:
+                    g_cogm = f"Rp {format_id(r['Gross_Margin_COGM'], 2)}"
+                    n_cogm = f"{format_id(r['Net_Margin_COGM (%)'], 2)}%"
+                    extra_tds += f"<td style='text-align: right;'>{g_cogm}</td><td style='text-align: center;'>{n_cogm}</td>"
+
+                g_cogs = f"Rp {format_id(r['Gross_Margin_COGS'], 2)}"
+                n_cogs = f"{format_id(r['Net_Margin_COGS (%)'], 2)}%"
+                extra_tds += f"<td style='text-align: right;'>{g_cogs}</td><td style='text-align: center;'>{n_cogs}</td>"
+
+                row_html = f"<tr><td style='text-align: center;'>{idx}</td><td style='text-align: left;'>{s_name}</td><td style='text-align: right;'>{net_sales}</td>{extra_tds}</tr>"
+                rows_list.append(row_html)
+
+            rows_html_str = "".join(rows_list)
+
+            # Buat header tabel secara aman
+            if user_role in ["admin", "direksi"]:
+                header_extra = "<th>Gross Margin COGM</th><th>Net Margin COGM (%)</th><th>Gross Margin COGS</th><th>Net Margin COGS (%)</th>"
+            else:
+                header_extra = "<th>Gross Margin COGS</th><th>Net Margin COGS (%)</th>"
+
+            # Render HTML lengkap dengan nowrap agar rapi dan bisa scroll horizontal
+            table_responsive_html = f"""
+            <div style="width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid #e6e6e6;">
+                <style>
+                    .custom-resp-table {{
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-family: sans-serif;
+                        font-size: 13px;
+                        background-color: white;
+                    }}
+                    .custom-resp-table th {{
+                        background-color: #f8f9fa;
+                        color: #333333;
+                        font-weight: 600;
+                        padding: 12px 10px;
+                        border-bottom: 2px solid #dee2e6;
+                        white-space: nowrap;
+                        text-align: center;
+                    }}
+                    .custom-resp-table td {{
+                        padding: 10px;
+                        border-bottom: 1px solid #eee;
+                        color: #444444;
+                        white-space: nowrap;
+                    }}
+                    .custom-resp-table tr:hover {{
+                        background-color: #f1f3f5;
+                    }}
+                </style>
+                <table class="custom-resp-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">No</th>
+                            <th style="text-align: left;">Sales Name</th>
+                            <th style="text-align: right;">Net Sales Excl Ppn</th>
+                            {header_extra}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html_str}
+                    </tbody>
+                </table>
+            </div>
+            """
 
             with st.container(border=True):
                 st.subheader("📋 Ringkasan Performa Per Sales")
-                st.dataframe(
-                    df_display,
-                    use_container_width=True,
-                    column_config=column_config_dict,
-                )
+                st.markdown(table_responsive_html, unsafe_allow_html=True)
 
         st.markdown(
             "<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True
         )
 
-        # 7. GRAFIK PENCAPAIAN SALES VS TARGET
+        # 7. GRAFIK PENCAPAIAN SALES VS TARGET (SUMBU Y TANPA DESIMAL, TOOLTIP DENGAN DESIMAL)
         if "Sales_Name" in df.columns and not df.empty:
             df_t1 = (
                 df.groupby(["Sales_Name", "Periode_Bulan"])["Target"]
@@ -425,28 +461,48 @@ else:
             )
             sales_order = df_target["Sales_Name"].tolist()
 
+            # Konversi nilai ke dalam satuan Juta (M) untuk sumbu Y
+            df_target["Target_in_M"] = df_target["Target"] / 1_000_000
+            df_target["Sales_in_M"] = (
+                df_target["Net_Sales_Amnt_Excl_Ppn"] / 1_000_000
+            )
+
             df_melted = df_target.melt(
                 id_vars="Sales_Name",
-                value_vars=["Target", "Net_Sales_Amnt_Excl_Ppn"],
+                value_vars=["Target_in_M", "Sales_in_M"],
                 var_name="Kategori",
-                value_name="Nominal",
+                value_name="Nominal_M",
             )
             df_melted["Kategori"] = df_melted["Kategori"].replace(
-                {"Target": "Target", "Net_Sales_Amnt_Excl_Ppn": "Net Sales"}
+                {"Target_in_M": "Target", "Sales_in_M": "Net Sales"}
             )
-            df_melted["Formatted_Nominal"] = df_melted["Nominal"].apply(
+
+            df_melted["Nominal_Asli"] = df_melted.apply(
+                lambda row: (
+                    df_target.loc[
+                        df_target["Sales_Name"] == row["Sales_Name"], "Target"
+                    ].values[0]
+                    if row["Kategori"] == "Target"
+                    else df_target.loc[
+                        df_target["Sales_Name"] == row["Sales_Name"],
+                        "Net_Sales_Amnt_Excl_Ppn",
+                    ].values[0]
+                ),
+                axis=1,
+            )
+            df_melted["Formatted_Nominal"] = df_melted["Nominal_Asli"].apply(
                 lambda x: format_id(x, 2)
             )
 
             fig_target = px.bar(
                 df_melted,
                 x="Sales_Name",
-                y="Nominal",
+                y="Nominal_M",
                 color="Kategori",
                 barmode="group",
                 category_orders={"Sales_Name": sales_order},
                 labels={
-                    "Nominal": "Nominal (Rp)",
+                    "Nominal_M": "Nominal (Juta Rp)",
                     "Sales_Name": "Sales Name",
                     "Kategori": "Keterangan",
                 },
@@ -459,23 +515,33 @@ else:
             fig_target.update_traces(
                 texttemplate="Rp %{text}",
                 textposition="outside",
+                textangle=-90,
                 hovertemplate="<b>%{x}</b><br>%{legendgroup}: Rp %{customdata[0]}<extra></extra>",
             )
 
+            num_sales = len(sales_order)
+
             fig_target.update_layout(
-                font=dict(family="sans-serif", size=12, color="#333333"),
+                height=480,
+                font=dict(family="sans-serif", size=11, color="#333333"),
                 legend=dict(
                     orientation="h",
-                    y=1.15,
+                    y=-0.25,
                     x=0.5,
                     xanchor="center",
                     bgcolor="rgba(255,255,255,0.8)",
                     bordercolor="rgba(0,0,0,0.1)",
                     borderwidth=1,
                 ),
-                margin=dict(l=20, r=20, t=50, b=20),
+                margin=dict(l=20, r=20, t=40, b=80),
                 xaxis=dict(
-                    showgrid=False,
+                    type="category",
+                    tickangle=-35,
+                    tickfont=dict(size=10),
+                    showgrid=True,
+                    gridcolor="rgba(0,0,0,0.15)",
+                    gridwidth=1,
+                    tickvals=[i - 0.5 for i in range(1, num_sales + 1)],
                     showline=True,
                     linewidth=1,
                     linecolor="lightgray",
@@ -486,7 +552,8 @@ else:
                     showline=True,
                     linewidth=1,
                     linecolor="lightgray",
-                    tickformat=",.2f",
+                    tickformat=",.0f",
+                    ticksuffix=" M",
                 ),
             )
 
@@ -498,14 +565,16 @@ else:
                     config={"displayModeBar": False},
                 )
 
-        # 8. 10 PRODUK TERATAS & 10 CUSTOMER TERTINGGI
+        # 8. 10 PRODUK TERATAS & 10 CUSTOMER TERTINGGI (SUMBU Y TANPA DESIMAL)
         c1, c2 = st.columns(2)
 
         with c1:
             item_col = (
                 "KeyItem"
                 if "KeyItem" in df.columns
-                else ("Item_Name_Vam" if "Item_Name_Vam" in df.columns else None)
+                else (
+                    "Item_Name_Vam" if "Item_Name_Vam" in df.columns else None
+                )
             )
 
             if item_col:
@@ -515,9 +584,9 @@ else:
                 top_products = top_products.sort_values(
                     by="Tot_Qty_Kg", ascending=False
                 ).head(10)
-                top_products["Formatted_Qty"] = top_products["Tot_Qty_Kg"].apply(
-                    lambda x: format_id(x, 2)
-                )
+                top_products["Formatted_Qty"] = top_products[
+                    "Tot_Qty_Kg"
+                ].apply(lambda x: format_id(x, 2))
 
                 fig_prod = px.bar(
                     top_products,
@@ -539,10 +608,11 @@ else:
                     hovertemplate="<b>%{x}</b><br>Total Qty: %{customdata[0]} Kg<extra></extra>",
                 )
                 fig_prod.update_layout(
-                    height=450,
+                    height=420,
                     bargap=0.3,
                     xaxis=dict(
-                        tickangle=-35,
+                        tickangle=-45,
+                        tickfont=dict(size=9),
                         showgrid=False,
                         showline=True,
                         linewidth=1,
@@ -554,9 +624,9 @@ else:
                         showline=True,
                         linewidth=1,
                         linecolor="lightgray",
-                        tickformat=",.2f",
+                        tickformat=",.0f",
                     ),
-                    margin=dict(l=20, r=20, t=30, b=80),
+                    margin=dict(l=10, r=10, t=20, b=90),
                     coloraxis_showscale=False,
                 )
 
@@ -582,8 +652,10 @@ else:
                 top_cust = top_cust.sort_values(
                     by="Net_Sales_Amnt_Excl_Ppn", ascending=False
                 ).head(10)
-                top_cust = top_cust.sort_values(
-                    by="Net_Sales_Amnt_Excl_Ppn", ascending=True
+
+                # Konversi nilai ke dalam satuan Juta (M) untuk sumbu Y
+                top_cust["Sales_in_M"] = (
+                    top_cust["Net_Sales_Amnt_Excl_Ppn"] / 1_000_000
                 )
                 top_cust["Formatted_Sales"] = top_cust[
                     "Net_Sales_Amnt_Excl_Ppn"
@@ -591,43 +663,46 @@ else:
 
                 fig_cust = px.bar(
                     top_cust,
-                    x="Net_Sales_Amnt_Excl_Ppn",
-                    y="Cust_Name",
-                    orientation="h",
+                    x="Cust_Name",
+                    y="Sales_in_M",
                     labels={
                         "Cust_Name": "Customer Name",
-                        "Net_Sales_Amnt_Excl_Ppn": "Net Sales (Rp)",
+                        "Sales_in_M": "Net Sales (Juta Rp)",
                     },
                     template="plotly_white",
-                    color="Net_Sales_Amnt_Excl_Ppn",
+                    color="Sales_in_M",
                     color_continuous_scale="Tealgrn",
-                    text="Formatted_Sales",
+                    text=top_cust["Net_Sales_Amnt_Excl_Ppn"].apply(
+                        lambda x: format_id(x, 2)
+                    ),
                     custom_data=["Formatted_Sales"],
                 )
                 fig_cust.update_traces(
                     texttemplate="Rp %{text}",
                     textposition="outside",
-                    hovertemplate="<b>%{y}</b><br>Net Sales: Rp %{customdata[0]}<extra></extra>",
+                    hovertemplate="<b>%{x}</b><br>Net Sales: Rp %{customdata[0]}<extra></extra>",
                 )
                 fig_cust.update_layout(
-                    height=450,
+                    height=420,
                     bargap=0.3,
                     xaxis=dict(
+                        tickangle=-45,
+                        tickfont=dict(size=9),
+                        showgrid=False,
+                        showline=True,
+                        linewidth=1,
+                        linecolor="lightgray",
+                    ),
+                    yaxis=dict(
                         showgrid=True,
                         gridcolor="rgba(0,0,0,0.08)",
                         showline=True,
                         linewidth=1,
                         linecolor="lightgray",
-                        tickformat=",.2f",
+                        tickformat=",.0f",
+                        ticksuffix=" M",
                     ),
-                    yaxis=dict(
-                        showgrid=False,
-                        showline=True,
-                        linewidth=1,
-                        linecolor="lightgray",
-                        categoryorder="total ascending",
-                    ),
-                    margin=dict(l=20, r=20, t=30, b=40),
+                    margin=dict(l=10, r=10, t=20, b=90),
                     coloraxis_showscale=False,
                 )
 
@@ -675,9 +750,13 @@ else:
                 marker=dict(line=dict(color="#ffffff", width=2)),
             )
             fig_branch.update_layout(
-                margin=dict(l=20, r=20, t=10, b=10),
+                margin=dict(l=20, r=20, t=10, b=30),
                 legend=dict(
-                    orientation="h", y=-0.1, x=0.5, xanchor="center"
+                    orientation="h",
+                    y=-0.2,
+                    x=0.5,
+                    xanchor="center",
+                    font=dict(size=10),
                 ),
             )
 

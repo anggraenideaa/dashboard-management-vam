@@ -529,7 +529,7 @@ with header_col2:
                 barmode="group",
                 category_orders={"Sales_Name": df_tg["Sales_Name"].tolist()},
                 labels={
-                    "Nominal_M": "Nominal (Juta Rp)",
+                    "Nominal_M": "Nominal (Rp)",
                     "Sales_Name": "Sales Name",
                     "Kategori": "Keterangan",
                 },
@@ -1049,7 +1049,7 @@ else:
             barmode="group",
             category_orders={"Sales_Name": sales_order},
             labels={
-                "Nominal_M": "Nominal (Juta Rp)",
+                "Nominal_M": "Nominal (Rp)",
                 "Sales_Name": "Sales Name",
                 "Kategori": "Keterangan"
             },
@@ -1353,7 +1353,7 @@ else:
                 y="Sales_in_M",
                 labels={
                     "Cust_Name": "Customer Name",
-                    "Sales_in_M": "Net Sales (Juta Rp)"
+                    "Sales_in_M": "Net Sales (Rp)"
                 },
                 template="plotly_white",
                 color="Sales_in_M",

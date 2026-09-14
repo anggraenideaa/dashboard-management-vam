@@ -79,8 +79,8 @@ else:
         df[col_tgl_inv] = pd.to_datetime(df[col_tgl_inv], errors="coerce")
 
         # Rentang tanggal mingguan default
-        start_date = pd.to_datetime("2026-08-29")
-        end_date = pd.to_datetime("2026-09-04")
+        start_date = pd.to_datetime("2026-09-05")
+        end_date = pd.to_datetime("2026-09-11")
 
         df = df[
             (df[col_tgl_inv] >= start_date) & (df[col_tgl_inv] <= end_date)
@@ -92,7 +92,7 @@ else:
 
     if df.empty:
         st.warning(
-            "Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (29 Agustus - 04 September 2026)."
+            "Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (05 September - 11 September 2026)."
         )
     else:
         # 2. PEMBERSIHAN DATA NET SALES
@@ -188,7 +188,7 @@ else:
                     df[date_col].dt.to_period("M").astype(str)
                 )
             else:
-                df["Periode_Bulan"] = "2026-08"
+                df["Periode_Bulan"] = "2026-09"
 
         # TENTUKAN KOLOM BIAYA UTAMA (METRIK) BERDASARKAN ROLE
         if user_role in ["admin", "direksi"]:
@@ -267,7 +267,7 @@ else:
                     df = df[df["Periode_Bulan"].isin(selected_periode)]
 
         st.caption(
-            f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 29 Agustus - 04 September 2026): **{format_id(len(df), 0)} baris**"
+            f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 05 September - 11 September 2026): **{format_id(len(df), 0)} baris**"
         )
         st.markdown(
             "<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True

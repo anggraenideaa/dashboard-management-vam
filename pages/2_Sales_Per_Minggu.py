@@ -79,8 +79,8 @@ else:
         df[col_tgl_inv] = pd.to_datetime(df[col_tgl_inv], errors="coerce")
 
         # Rentang tanggal mingguan default
-        start_date = pd.to_datetime("2026-09-19")
-        end_date = pd.to_datetime("2026-09-25")
+        start_date = pd.to_datetime("2026-09-26")
+        end_date = pd.to_datetime("2026-10-02")
 
         df = df[
             (df[col_tgl_inv] >= start_date) & (df[col_tgl_inv] <= end_date)
@@ -92,7 +92,7 @@ else:
 
     if df.empty:
         st.warning(
-            "Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (19 September - 25 September 2026)."
+            "Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (26 September - 02 Oktober 2026)."
         )
     else:
         # 2. PEMBERSIHAN DATA NET SALES
@@ -267,7 +267,7 @@ else:
                     df = df[df["Periode_Bulan"].isin(selected_periode)]
 
         st.caption(
-            f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 19 September - 25 September 2026): **{format_id(len(df), 0)} baris**"
+            f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 26 September - 02 Oktober 2026): **{format_id(len(df), 0)} baris**"
         )
         st.markdown(
             "<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True

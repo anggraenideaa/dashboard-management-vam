@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Pricelist & HPP Barang", layout="wide", initial_sidebar_state="auto"
+    page_title="Pricelist / HPP Barang", layout="wide", initial_sidebar_state="auto"
 )
 
 
@@ -127,7 +127,7 @@ responsive_table_css = """
 
 st.markdown(responsive_table_css, unsafe_allow_html=True)
 
-st.title("🏷️ Pricelist & HPP Barang")
+st.title("🏷️ Pricelist / HPP Barang")
 st.markdown("<div class='spacer-15'></div>", unsafe_allow_html=True)
 
 # AMBIL DATA DARI SHEET "HPP Berlaku"
@@ -239,7 +239,7 @@ else:
     st.markdown("<div class='spacer-10'></div>", unsafe_allow_html=True)
 
     with st.container(border=True):
-        st.subheader("📋 Tabel Pricelist & HPP Berlaku")
+        st.subheader("📋 Tabel Pricelist / HPP Berlaku")
         st.markdown("<div class='spacer-5'></div>", unsafe_allow_html=True)
 
         html_table = df_display.to_html(index=False, escape=False)

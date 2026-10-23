@@ -342,19 +342,15 @@ b.metric("Collection Aktual",rupiah(collection_amount))
 a,b = st.columns(2)
 a.metric("Outstanding Saat Ini",rupiah(filtered["Outstanding"].sum()))
 b.metric("Margin Collection",rupiah(margin_amount))
-with st.expander("Rekonsiliasi Margin Collection",expanded=True):
+with st.expander("Rincian Margin Collection",expanded=True):
     st.write(f"**Collection termasuk PPN:** {rupiah(collection_amount)}")
     st.write(f"**Alokasi PPN:** {rupiah(filtered.loc[valid_payments,'PPN_Bulan'].sum())}")
     st.write(f"**Alokasi Total COGS:** {rupiah(filtered.loc[valid_payments,'COGS_Bulan'].sum())}")
-    st.write(f"**Margin Collection (Estimasi):** {rupiah(margin_amount)}")
-    st.caption("Estimasi mengikuti pembayaran yang diterima; bukan laba akuntansi periode berjalan. "
-               "Total_COGS = COGS per kg × kuantitas item. Collection Aktual mengikuti kode asli: seluruh Payment_Amnt positif per baris dalam periode, tanpa deduplikasi otomatis.")
+    st.write(f"**Margin Collection:** {rupiah(margin_amount)}")
     omitted = filtered.loc[invalid_payments,"Collection_Bulan"].sum()
     if omitted > .01:
         st.warning(f"Ada {rupiah(omitted)} pembayaran yang dasar penjualan invoice-nya kosong/tidak valid; "
-                   "pembayaran itu tetap masuk Collection Aktual, tetapi tidak dimasukkan dalam estimasi Margin Collection.")
-    st.caption("Catatan: pembayaran tidak dideduplikasi otomatis. Jika Payment_Amnt berulang antar baris item, "
-               "angka Collection Aktual tetap mengikuti metode kode awal dan dapat mencakup pencatatan berulang pada sumber.")
+                   "pembayaran tersebut tetap masuk Collection Aktual, tetapi belum masuk perhitungan Margin Collection.")
 if filtered.empty:
     st.warning("Tidak ada customer sesuai filter.")
     st.stop()

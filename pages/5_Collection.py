@@ -542,7 +542,10 @@ if query.strip():
 
 # dibaca dari session_state sebelum KPI dihitung agar semua KPI ikut terfilter.
 
-customer_options = sorted(filtered["Customer"].dropna().unique().tolist())
+# Dropdown hanya menampilkan customer yang masih memiliki outstanding,
+# sama dengan kriteria Ringkasan per Customer (total Balance > 0.009).
+customer_balances = filtered.groupby("Customer")["Outstanding"].sum()
+customer_options = sorted(customer_balances[customer_balances > 0.009].index.tolist())
 
 customer_widget_key = "collection_detail_customer_selection"
 
@@ -628,15 +631,17 @@ summary_all = filtered.groupby("Customer", as_index=False).agg(
 
 # Ringkasan hanya customer yang MASIH mempunyai tagihan (Outstanding > 0).
 
-# Customer lunas tetap tersedia pada pilihan detail dan KPI/Collection bulanan.
+# Customer lunas tidak muncul pada dropdown; pembayaran tetap dihitung pada KPI global.
 
 summary = summary_all.loc[summary_all["Outstanding"] > 0.009].copy()
 
 summary = summary.sort_values(
 
-    ["Jatuh_Tempo_Belum_Lunas", "Outstanding", "Customer"],
+    ["Customer"],
 
-    ascending=[False, False, True],
+    ascending=[True],
+
+    key=lambda col: col.astype(str).str.casefold(),
 
 ).reset_index(drop=True)
 

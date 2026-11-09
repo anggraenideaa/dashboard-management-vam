@@ -351,7 +351,7 @@ def generate_full_pdf(summary_df, t_net_sales, t_cost, t_margin, c_label,
     return buffer.getvalue()
 
 
-LAST_UPDATE_DATE = "02 November 2026"
+LAST_UPDATE_DATE = "09 November 2026"
 
 
 # Pagination grafik Sales vs Target:

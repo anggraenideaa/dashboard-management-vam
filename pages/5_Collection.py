@@ -4,7 +4,7 @@ Collection Aktual = SUM(Payment_Amnt positif untuk Payment_Date pada periode),
 
 setelah filter dan tanpa penghapusan otomatis baris pembayaran.
 
-Margin Collection prorata dihitung per produk dari penjualan tanpa PPN dan Total_COGS.
+Margin Collection dihitung sebagai Gross Profit produk yang direalisasikan proporsional terhadap pembayaran: Gross Profit x (pembayaran / penjualan termasuk PPN), dengan rasio maksimal 100%.
 
 """
 
@@ -142,7 +142,7 @@ def prepare(source):
 
         raise ValueError("Kolom wajib tidak ditemukan: " + ", ".join(absent))
 
-    text_cols = ["No_Inv", "No_SJ", "Cust_Name", "Company", "Branch", "Sales_Name", "Item_Name_Vam", "KeyItem", "Acc_Bank", "Ket_Bayar", "Tanda", "Batch_Number"]
+    text_cols = ["No_Inv", "No_SJ", "Cust_Name", "Company", "Branch", "Sales_Name", "Item_Name_Vam", "KeyItem", "Acc_Bank", "Ket_Bayar", "Batch_Number"]
 
     for col in text_cols:
 
@@ -166,7 +166,8 @@ def prepare(source):
 
         d[col] = to_dates(d[col]) if col in d else pd.NaT
 
-    d = d[d["Cust_Name"].ne("") & d["Tanda"].str.upper().isin(("", "V", "VAM"))].copy()
+    # Tidak menggunakan filter Tanda: seluruh baris dengan nama customer valid diproses.
+    d = d[d["Cust_Name"].ne("")].copy()
 
     d["Customer"] = d["Cust_Name"].str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
 
@@ -196,33 +197,83 @@ def prepare(source):
 
     # Semua nilai penjualan dan COGS adalah PER PRODUK, bukan per invoice.
 
-    # Payment_Amnt juga dialokasikan PER PRODUK; jangan deduplikasi pembayaran.
+    # Payment_Amnt juga dicatat/dialokasikan PER PRODUK; jangan deduplikasi pembayaran.
 
-    # Rasio prorata dihitung pada setiap baris produk.
+    # Gross profit adalah penjualan tanpa PPN dikurangi Total COGS.
 
-    # PPN tidak dianggap sebagai margin maupun biaya produksi.
+    # Kolom ini harus dibuat sebelum digunakan untuk menghitung Margin Collection.
+
+    d["Gross_Profit"] = (
+
+        d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGS"]
+
+    )
+
+    # Gross margin dihitung dari penjualan TANPA PPN karena PPN bukan pendapatan.
+
+    # Margin_Ratio = (Net Sales Excl PPN - Total COGS) / Net Sales Excl PPN.
 
     d["Margin_Valid"] = (
 
-        d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
-
-        & d["Net_Sales_Amnt_Excl_Ppn"].gt(0)
+        d["Net_Sales_Amnt_Excl_Ppn"].gt(0)
 
         & d["Total_COGS"].ge(0)
 
     )
 
-    denom = d["Net_Sales_Amnt_Incl_Ppn"].where(d["Margin_Valid"])
+    # Rasio biaya dan margin menggunakan basis penjualan tanpa PPN.
 
-    d["Sales_Ratio"] = (d["Net_Sales_Amnt_Excl_Ppn"] / denom).fillna(0.0)
+    denom_excl_ppn = d["Net_Sales_Amnt_Excl_Ppn"].where(d["Margin_Valid"])
 
-    d["Cost_Ratio"] = (d["Total_COGS"] / denom).fillna(0.0)
+    d["Cost_Ratio"] = (d["Total_COGS"] / denom_excl_ppn).fillna(0.0)
 
-    d["Margin_Ratio"] = d["Sales_Ratio"] - d["Cost_Ratio"]
+    d["Margin_Ratio"] = (
 
-    # Pembayaran bulan terpilih dikalikan margin produk yang bersangkutan.
+        (d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGS"]) / denom_excl_ppn
 
-    # Margin negatif (produk rugi) sengaja tetap dihitung.
+    ).fillna(0.0)
+
+    # Rasio penjualan tanpa PPN terhadap penjualan termasuk PPN hanya
+
+    # dipakai untuk estimasi pemisahan PPN dari pembayaran, bukan margin.
+
+    denom_incl_ppn = d["Net_Sales_Amnt_Incl_Ppn"].where(
+
+        d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
+
+    )
+
+    d["Sales_Ratio"] = (
+
+        d["Net_Sales_Amnt_Excl_Ppn"] / denom_incl_ppn
+
+    ).fillna(0.0)
+
+    # Margin Collection adalah bagian Gross Profit yang sudah terealisasi
+
+    # melalui pembayaran customer. Karena Payment_Amnt termasuk PPN,
+
+    # rasio pembayaran dibandingkan dengan nilai penjualan termasuk PPN.
+
+    # Jika lunas 100%, Margin Collection sama dengan Gross Profit.
+
+    # Jika dibayar sebagian, Gross Profit diakui secara proporsional.
+
+    # Rasio dibatasi 0-100% agar kelebihan bayar tidak membuat margin melebihi
+
+    # Gross Profit invoice/produk. Pembayaran negatif tidak masuk Collection Aktual.
+
+    denom_payment = d["Net_Sales_Amnt_Incl_Ppn"].where(
+
+        d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
+
+    )
+
+    d["Collection_Ratio"] = (
+
+        d["Pembayaran"] / denom_payment
+
+    ).replace([float("inf"), -float("inf")], 0).fillna(0).clip(lower=0, upper=1)
 
     d["Pembayaran_Raw"] = d["Pembayaran"]
 
@@ -230,9 +281,11 @@ def prepare(source):
 
     d["Item_Replicated_By_Payment"] = False
 
-    d["Margin_Pembayaran"] = d["Pembayaran"] * d["Margin_Ratio"]
+    d["Margin_Pembayaran"] = d["Gross_Profit"] * d["Collection_Ratio"]
 
-    d["COGS_Pembayaran"] = d["Pembayaran"] * d["Cost_Ratio"]
+    # Estimasi COGS dan PPN yang terealisasi mengikuti proporsi pembayaran.
+
+    d["COGS_Pembayaran"] = d["Total_COGS"] * d["Collection_Ratio"]
 
     d["PPN_Pembayaran"] = d["Pembayaran"] * (1 - d["Sales_Ratio"])
 
@@ -404,7 +457,7 @@ def create_summary_pdf(table, period, totals, filters):
 
         Paragraph("Catatan: jatuh tempo dihitung dari Balance terkini untuk invoice dengan Jth_Tempo sampai akhir periode. "
 
-                  "Collection mengikuti Payment_Date bulan terpilih. Margin Collection = jumlah margin prorata per produk: pembayaran x (penjualan produk tanpa PPN - COGS produk) / penjualan produk termasuk PPN.", style_small),
+                  "Collection mengikuti Payment_Date bulan terpilih. Margin Collection = Gross Profit produk (penjualan tanpa PPN dikurangi COGS) dikalikan rasio pembayaran terhadap penjualan termasuk PPN, maksimal 100%. Jika invoice lunas, Margin Collection sama dengan Gross Profit. PPN tidak menjadi pendapatan.", style_small),
 
     ])
 
@@ -462,29 +515,15 @@ if df.empty:
 
     st.stop()
 
-# Filter Periode Collection hanya mengikuti Payment_Date sampai bulan berjalan.
-
-# Jth_Tempo tetap dipakai khusus untuk menghitung tagihan jatuh tempo,
-
-# tetapi tidak boleh memperpanjang pilihan periode hingga tahun mendatang.
-
+# Pilihan Periode Collection murni kalender, tidak bergantung pada data transaksi.
+# Bulan pertama bisa disesuaikan tanpa membaca Payment_Date atau Jth_Tempo.
 current_month = pd.Timestamp.today().to_period("M")
-
-valid_payment_dates = df.loc[
-
-    df["Payment_Date"].notna()
-
-    & df["Payment_Date"].le(current_month.end_time),
-
-    "Payment_Date",
-
-]
-
-first = valid_payment_dates.min().to_period("M") if not valid_payment_dates.empty else current_month
-
-periods = [str(p) for p in pd.period_range(first, current_month, freq="M")][::-1]
-
-default = str(current_month)
+first_calendar_month = pd.Period("2020-01", freq="M")
+periods = [
+    p.strftime("%Y%m")
+    for p in pd.period_range(first_calendar_month, current_month, freq="M")
+][::-1]
+default = current_month.strftime("%Y%m")
 
 # Penting: sumber tab 2025 mungkin tidak memuat tagihan/pembayaran tahun 2026.
 
@@ -543,8 +582,11 @@ if query.strip():
 # dibaca dari session_state sebelum KPI dihitung agar semua KPI ikut terfilter.
 
 # Dropdown hanya menampilkan customer yang masih memiliki outstanding,
+
 # sama dengan kriteria Ringkasan per Customer (total Balance > 0.009).
+
 customer_balances = filtered.groupby("Customer")["Outstanding"].sum()
+
 customer_options = sorted(customer_balances[customer_balances > 0.009].index.tolist())
 
 customer_widget_key = "collection_detail_customer_selection"
@@ -569,9 +611,10 @@ if selected_customers:
 
     filtered = filtered[filtered["Customer"].isin(selected_customers)].copy()
 
-start = pd.Period(period, freq="M").start_time
+selected_period = pd.Period(pd.to_datetime(period, format="%Y%m"), freq="M")
+start = selected_period.start_time
 
-end = pd.Period(period, freq="M").end_time
+end = selected_period.end_time
 
 filtered = filtered.copy()
 
@@ -672,25 +715,45 @@ else:
     ), width="stretch", hide_index=True)
 
 if not summary.empty:
+
     try:
+
         summary_pdf = create_summary_pdf(
+
             summary, period,
+
             (
+
                 filtered["Jatuh_Tempo_Belum_Lunas"].sum(),
+
                 collection_amount,
+
                 filtered["Outstanding"].sum(),
+
                 margin_amount,
+
             ),
+
             "Filter dashboard yang sedang aktif",
+
         )
+
         st.download_button(
+
             "⬇️ Download Ringkasan Customer (PDF)",
+
             data=summary_pdf,
+
             file_name=f"ringkasan_collection_{period}.pdf",
+
             mime="application/pdf",
+
             key="download_summary_collection_pdf",
+
         )
+
     except Exception as exc:
+
         st.error(f"Gagal membuat PDF ringkasan: {exc}")
 
 st.divider()
@@ -763,6 +826,8 @@ def bentuk_tabel_invoice(rows, pembayaran_only=False):
 
             Ppn=("Ppn", "sum"),
 
+            Total_COGS=("Total_COGS", "sum"),
+
             Balance=("Outstanding", "sum"),
 
         )
@@ -780,6 +845,8 @@ def bentuk_tabel_invoice(rows, pembayaran_only=False):
             Payment_Date_Sort=("Payment_Date", "max"),
 
             Payment_Amnt=("Collection_Bulan", "sum"),
+
+            Margin_Collection=("Margin_Bulan", "sum"),
 
         )
 
@@ -833,6 +900,10 @@ def tampilkan_invoice(data, sort_cols, ascending):
 
         "Payment_Amnt": "Payment Amount",
 
+        "Margin_Collection": "Margin Collection",
+
+        "Total_COGS": "Total COGS",
+
         "Balance": "Balance",
 
     })
@@ -841,21 +912,37 @@ def tampilkan_invoice(data, sort_cols, ascending):
 
         display[col] = pd.to_datetime(display[col], errors="coerce").dt.strftime("%d-%m-%Y").fillna("—")
 
-    for col in ["Total Amount", "PPN", "Payment Amount", "Balance"]:
+    for col in ["Total Amount", "PPN", "Payment Amount", "Total COGS", "Margin Collection", "Balance"]:
 
-        display[col] = display[col].map(rupiah)
+        if col in display.columns:
+
+            display[col] = display[col].map(rupiah)
 
     display.insert(0, "No.", range(1, len(display) + 1))
 
-    return display[[
+    output_cols = [
 
         "No.", "Customer", "No. Invoice", "Tanggal Invoice", "Jatuh Tempo",
 
         "Company", "Branch", "Total Amount", "PPN", "Payment Date",
 
-        "Payment Amount", "Balance",
+        "Payment Amount",
 
-    ]]
+    ]
+
+    # Kolom ini hanya tersedia pada tabel Collection Customer.
+
+    if "Total COGS" in display.columns:
+
+        output_cols.append("Total COGS")
+
+    if "Margin Collection" in display.columns:
+
+        output_cols.append("Margin Collection")
+
+    output_cols.append("Balance")
+
+    return display[output_cols]
 
 def create_tagihan_pdf(display_table, periode, balance_total, customer_names):
 
@@ -933,7 +1020,7 @@ def create_tagihan_pdf(display_table, periode, balance_total, customer_names):
 
         Paragraph("Periode pilihan: " + escape(str(periode)) + " | Customer: " + escape(", ".join(customer_names)), info_style),
 
-        Paragraph("Tagihan: seluruh invoice dengan Balance &gt; 0, termasuk yang sudah lewat jatuh tempo. Diurutkan dari jatuh tempo terlama.", info_style),
+        Paragraph("Tagihan: invoice dengan Balance &gt; 0 dan tanggal jatuh tempo sampai akhir periode pilihan. Diurutkan dari jatuh tempo terlama.", info_style),
 
         Spacer(1, 6),
 
@@ -991,7 +1078,7 @@ def create_tagihan_pdf(display_table, periode, balance_total, customer_names):
 
     elements.append(Spacer(1, 12))
 
-    elements.append(Paragraph("TOTAL BALANCE CUSTOMER: " + escape(rupiah(balance_total)), title_style))
+    elements.append(Paragraph("TOTAL TAGIHAN JATUH TEMPO: " + escape(rupiah(balance_total)), title_style))
 
     elements.append(Paragraph(
 
@@ -1209,7 +1296,7 @@ st.divider()
 
 # TABEL 2: Piutang dipisahkan berdasarkan jatuh tempo untuk penagihan.
 
-# Klasifikasi memakai tanggal HARI INI (bukan akhir periode Collection).
+# Klasifikasi memakai akhir bulan dari periode Collection yang dipilih.
 
 # Seluruh invoice Balance > 0 masuk tepat satu kategori.
 
@@ -1219,19 +1306,19 @@ tagihan_invoices = bentuk_tabel_invoice(tagihan_rows)
 
 tagihan_invoices = tagihan_invoices.loc[tagihan_invoices["Balance"].gt(0.009)].copy()
 
-hari_ini = pd.Timestamp.today().normalize()
+batas_jatuh_tempo = end.normalize()
 
 tagihan_invoices["Jth_Tempo"] = pd.to_datetime(tagihan_invoices["Jth_Tempo"], errors="coerce")
 
 tagihan_invoices["Hari_Terlambat"] = (
 
-    (hari_ini - tagihan_invoices["Jth_Tempo"]).dt.days.clip(lower=0).fillna(0).astype(int)
+    (batas_jatuh_tempo - tagihan_invoices["Jth_Tempo"]).dt.days.clip(lower=0).fillna(0).astype(int)
 
 )
 
-lewat_tempo = tagihan_invoices["Jth_Tempo"].notna() & tagihan_invoices["Jth_Tempo"].lt(hari_ini)
+lewat_tempo = tagihan_invoices["Jth_Tempo"].notna() & tagihan_invoices["Jth_Tempo"].le(batas_jatuh_tempo)
 
-belum_tempo = tagihan_invoices["Jth_Tempo"].notna() & tagihan_invoices["Jth_Tempo"].ge(hari_ini)
+belum_tempo = tagihan_invoices["Jth_Tempo"].notna() & tagihan_invoices["Jth_Tempo"].gt(batas_jatuh_tempo)
 
 tanpa_tempo = tagihan_invoices["Jth_Tempo"].isna()
 
@@ -1239,9 +1326,9 @@ st.markdown("#### Tagihan Customer")
 
 st.caption(
 
-    f"Status jatuh tempo dihitung per {hari_ini:%d-%m-%Y} (tanggal hari ini), "
+    f"Status jatuh tempo dihitung sampai {batas_jatuh_tempo:%d-%m-%Y} (akhir periode pilihan), "
 
-    "bukan berdasarkan bulan Collection yang dipilih. Hanya invoice dengan Balance > 0."
+    "termasuk seluruh bulan sebelumnya. Hanya invoice dengan Balance > 0."
 
 )
 
@@ -1265,8 +1352,6 @@ def tampilkan_kategori_tagihan(data, judul, keterangan):
 
         st.dataframe(display, width="stretch", hide_index=True)
 
-
-
 # Yang paling lama lewat jatuh tempo berada di baris teratas.
 
 tampilkan_kategori_tagihan(
@@ -1285,29 +1370,27 @@ tampilkan_kategori_tagihan(
 
     tagihan_invoices.loc[belum_tempo].copy(),
 
-    "Outstanding Belum Jatuh Tempo",
+    "Outstanding Belum Jatuh Tempo (Setelah Periode)",
 
-    "Diurutkan dari tanggal jatuh tempo terdekat."
+    "Jatuh tempo setelah akhir bulan yang dipilih, diurutkan dari tanggal terdekat."
 
 )
 
 if tanpa_tempo.any():
 
-    st.caption("Ada invoice dengan tanggal jatuh tempo kosong/tidak valid; invoice tersebut tetap disertakan dalam PDF gabungan untuk verifikasi.")
-
-
+    st.caption("Ada invoice dengan tanggal jatuh tempo kosong/tidak valid; tidak dimasukkan ke tagihan jatuh tempo maupun PDF.")
 
 # Tetap sediakan PDF gabungan seperti versi dashboard sebelumnya.
 
 try:
 
-    gabungan = tampilkan_invoice(tagihan_invoices, ["Jth_Tempo", "Invoice_ID"], [True, True])
+    gabungan = tampilkan_invoice(tagihan_invoices.loc[lewat_tempo].copy(), ["Jth_Tempo", "Invoice_ID"], [True, True])
 
-    pdf_gabungan = create_tagihan_pdf(gabungan, period, tagihan_invoices["Balance"].sum(), selected_customers)
+    pdf_gabungan = create_tagihan_pdf(gabungan, period, tagihan_invoices.loc[lewat_tempo, "Balance"].sum(), selected_customers)
 
     st.download_button(
 
-        "⬇️ Download Semua Tagihan (PDF)", data=pdf_gabungan,
+        "⬇️ Download Tagihan Jatuh Tempo (PDF)", data=pdf_gabungan,
 
         file_name=f"tagihan_customer_{period}.pdf", mime="application/pdf",
 

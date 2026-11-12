@@ -18,511 +18,520 @@ from db import load_collection
 
 if not st.session_state.get("logged_in", False):
 
-    st.error("Silakan login terlebih dahulu.")
+     st.error("Silakan login terlebih dahulu.")
 
-    st.stop()
+     st.stop()
 
 if str(st.session_state.get("role", "")).strip().lower() not in ("direksi", "direktur"):
 
-    st.error("Halaman Collection hanya dapat diakses Direksi.")
+     st.error("Halaman Collection hanya dapat diakses Direksi.")
 
-    st.stop()
+     st.stop()
 
 def rupiah(value):
 
-    value = 0 if pd.isna(value) else float(value)
+     value = 0 if pd.isna(value) else float(value)
 
-    formatted = f"{value:,.2f}".replace(",", "§").replace(".", ",").replace("§", ".")
+     formatted = f"{value:,.2f}".replace(",", "§").replace(".", ",").replace("§", ".")
 
-    return f"Rp {formatted}"
+     return f"Rp {formatted}"
 
 def to_number(value):
 
-    """Membaca nominal uang dari format Indonesia dan internasional."""
+     """Membaca nominal uang dari format Indonesia dan internasional."""
 
-    if value is None or pd.isna(value) or str(value).strip() == "":
+     if value is None or pd.isna(value) or str(value).strip() == "":
 
-        return 0.0
+          return 0.0
 
-    if isinstance(value, (int, float)):
+     if isinstance(value, (int, float)):
 
-        return float(value)
+          return float(value)
 
-    s = re.sub(r"[^\d,.\-]", "", str(value).strip())
+     s = re.sub(r"[^\d,.-]", "", str(value).strip())
 
-    if s in ("", "-", ".", ","):
+     if s in ("", "-", ".", ","):
 
-        return 0.0
+          return 0.0
 
-    dots, commas = s.count("."), s.count(",")
+     dots, commas = s.count("."), s.count(",")
 
-    if dots and commas:
+     if dots and commas:
 
-        dec = "." if s.rfind(".") > s.rfind(",") else ","
+          dec = "." if s.rfind(".") > s.rfind(",") else ","
 
-        sep = "," if dec == "." else "."
+          sep = "," if dec == "." else "."
 
-        s = s.replace(sep, "").replace(dec, ".")
+          s = s.replace(sep, "").replace(dec, ".")
 
-    elif dots > 1 or commas > 1:
+     elif dots > 1 or commas > 1:
 
-        sep = "." if dots else ","
+          sep = "." if dots else ","
 
-        parts = s.split(sep)
+          parts = s.split(sep)
 
-        if all(len(p) == 3 for p in parts[1:]):
+          if all(len(p) == 3 for p in parts[1:]):
 
-            s = "".join(parts)
+               s = "".join(parts)
 
-        else:
+          else:
 
-            s = "".join(parts[:-1]) + "." + parts[-1]
+               s = "".join(parts[:-1]) + "." + parts[-1]
 
-    elif dots or commas:
+     elif dots or commas:
 
-        sep = "." if dots else ","
+          sep = "." if dots else ","
 
-        left, right = s.split(sep, 1)
+          left, right = s.split(sep, 1)
 
-        # 3.600 = 3600; 3599999.996 = 3599999.996 (bukan 3599999996)
+          # 3.600 = 3600; 3599999.996 = 3599999.996 (bukan 3599999996)
 
-        if len(right) == 3 and len(left.lstrip("-")) <= 3:
+          if len(right) == 3 and len(left.lstrip("-")) <= 3:
 
-            s = left + right
+               s = left + right
 
-        else:
+          else:
 
-            s = left + "." + right
+               s = left + "." + right
 
-    try:
+     try:
 
-        return float(s)
+          return float(s)
 
-    except ValueError:
+     except ValueError:
 
-        return 0.0
+          return 0.0
 
 def to_dates(series):
 
-    vals = series.astype("string").str.strip()
+     vals = series.astype("string").str.strip()
 
-    # Format data Collection adalah DD/MM/YYYY (contoh: 09/10/2026 = 9 Oktober).
+     # Format data Collection adalah DD/MM/YYYY (contoh: 09/10/2026 = 9 Oktober).
 
-    # Dahulukan hari/bulan; format Amerika hanya cadangan untuk tanggal >12 di posisi kedua.
+     # Dahulukan hari/bulan; format Amerika hanya cadangan untuk tanggal >12 di posisi kedua.
 
-    result = pd.to_datetime(vals, format="%d/%m/%Y", errors="coerce")
+     result = pd.to_datetime(vals, format="%d/%m/%Y", errors="coerce")
 
-    missing = result.isna()
+     missing = result.isna()
 
-    result.loc[missing] = pd.to_datetime(vals.loc[missing], format="%Y-%m-%d", errors="coerce")
+     result.loc[missing] = pd.to_datetime(vals.loc[missing], format="%Y-%m-%d", errors="coerce")
 
-    missing = result.isna()
+     missing = result.isna()
 
-    result.loc[missing] = pd.to_datetime(vals.loc[missing], format="%m/%d/%Y", errors="coerce")
+     result.loc[missing] = pd.to_datetime(vals.loc[missing], format="%m/%d/%Y", errors="coerce")
 
-    nums = pd.to_numeric(vals, errors="coerce")
+     nums = pd.to_numeric(vals, errors="coerce")
 
-    excel = result.isna() & nums.between(20000, 80000)
+     excel = result.isna() & nums.between(20000, 80000)
 
-    result.loc[excel] = pd.to_datetime(nums.loc[excel], origin="1899-12-30", unit="D", errors="coerce")
+     result.loc[excel] = pd.to_datetime(nums.loc[excel], origin="1899-12-30", unit="D", errors="coerce")
 
-    return result
+     return result
 
 def prepare(source):
 
-    d = source.copy()
+     d = source.copy()
 
-    d.columns = d.columns.map(lambda x: str(x).strip())
+     d.columns = d.columns.map(lambda x: str(x).strip())
 
-    needed = ["Cust_Name", "Net_Ar", "Balance", "Jth_Tempo", "Payment_Date", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_COGM"]
+     needed = ["Cust_Name", "Net_Ar", "Balance", "Jth_Tempo", "Payment_Date", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_COGM"]
 
-    absent = [x for x in needed if x not in d]
+     absent = [x for x in needed if x not in d]
 
-    if absent:
+     if absent:
 
-        raise ValueError("Kolom wajib tidak ditemukan: " + ", ".join(absent))
+          raise ValueError("Kolom wajib tidak ditemukan: " + ", ".join(absent))
 
-    text_cols = ["No_Inv", "No_SJ", "Cust_Name", "Company", "Branch", "Sales_Name", "Item_Name_Vam", "KeyItem", "Acc_Bank", "Ket_Bayar", "Batch_Number"]
+     text_cols = ["No_Inv", "No_SJ", "Cust_Name", "Company", "Branch", "Sales_Name", "Item_Name_Vam", "KeyItem", "Acc_Bank", "Ket_Bayar", "Batch_Number"]
 
-    for col in text_cols:
+     for col in text_cols:
 
-        if col not in d:
+          if col not in d:
 
-            d[col] = ""
+               d[col] = ""
 
-        d[col] = d[col].fillna("").astype(str).str.strip()
+          d[col] = d[col].fillna("").astype(str).str.strip()
 
-    for col in ["Total_Amnt", "Ppn"]:
+     for col in ["Total_Amnt", "Ppn"]:
 
-        if col not in d:
+          if col not in d:
 
-            raise ValueError(f"Kolom wajib detail invoice tidak ditemukan: {col}")
+               raise ValueError(f"Kolom wajib detail invoice tidak ditemukan: {col}")
 
-    for col in ["Net_Ar", "Balance", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_Amnt", "Ppn", "Total_COGM"]:
+     for col in ["Net_Ar", "Balance", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_Amnt", "Ppn", "Total_COGM"]:
 
-        d[col] = d[col].map(to_number)
+          d[col] = d[col].map(to_number)
 
-    for col in ["Payment_Date", "Jth_Tempo", "Tgl_Inv"]:
+     for col in ["Payment_Date", "Jth_Tempo", "Tgl_Inv"]:
 
-        d[col] = to_dates(d[col]) if col in d else pd.NaT
+          d[col] = to_dates(d[col]) if col in d else pd.NaT
 
-    # Tidak menggunakan filter Tanda: seluruh baris dengan nama customer valid diproses.
-    d = d[d["Cust_Name"].ne("")].copy()
+     # Tidak menggunakan filter Tanda: seluruh baris dengan nama customer valid diproses.
 
-    d["Customer"] = d["Cust_Name"].str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
+     d = d[d["Cust_Name"].ne("")].copy()
 
-    for col in ["Branch", "Sales_Name", "Company"]:
+     d["Customer"] = d["Cust_Name"].str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
 
-        d[col] = d[col].str.upper()
+     for col in ["Branch", "Sales_Name", "Company"]:
 
-    valid_inv = ~d["No_Inv"].str.upper().isin(("", "-", "NAN", "NONE"))
+          d[col] = d[col].str.upper()
 
-    valid_sj = ~d["No_SJ"].str.upper().isin(("", "-", "NAN", "NONE"))
+     valid_inv = ~d["No_Inv"].str.upper().isin(("", "-", "NAN", "NONE"))
 
-    d["Invoice_ID"] = d["No_Inv"]
+     valid_sj = ~d["No_SJ"].str.upper().isin(("", "-", "NAN", "NONE"))
 
-    d.loc[~valid_inv & valid_sj, "Invoice_ID"] = "SJ: " + d.loc[~valid_inv & valid_sj, "No_SJ"]
+     d["Invoice_ID"] = d["No_Inv"]
 
-    neither = ~valid_inv & ~valid_sj
+     d.loc[~valid_inv & valid_sj, "Invoice_ID"] = "SJ: " + d.loc[~valid_inv & valid_sj, "No_SJ"]
 
-    d.loc[neither, "Invoice_ID"] = "BARIS: " + d.index[neither].astype(str)
+     neither = ~valid_inv & ~valid_sj
 
-    d["Tagihan"] = d["Net_Ar"].clip(lower=0)
+     d.loc[neither, "Invoice_ID"] = "BARIS: " + d.index[neither].astype(str)
 
-    d["Outstanding"] = d["Balance"].clip(lower=0)
+     d["Tagihan"] = d["Net_Ar"].clip(lower=0)
 
-    d.loc[d["Outstanding"].abs() < 0.01, "Outstanding"] = 0.0
+     d["Outstanding"] = d["Balance"].clip(lower=0)
 
-    d["Pembayaran"] = d["Payment_Amnt"].where(d["Payment_Date"].notna() & d["Payment_Amnt"].gt(0), 0.0)
+     d.loc[d["Outstanding"].abs() < 0.01, "Outstanding"] = 0.0
 
-    # Semua nilai penjualan dan COGM adalah PER PRODUK, bukan per invoice.
+     d["Pembayaran"] = d["Payment_Amnt"].where(d["Payment_Date"].notna() & d["Payment_Amnt"].gt(0), 0.0)
 
-    # Payment_Amnt juga dicatat/dialokasikan PER PRODUK; jangan deduplikasi pembayaran.
+     # Semua nilai penjualan dan COGM adalah PER PRODUK, bukan per invoice.
 
-    # Gross profit adalah penjualan tanpa PPN dikurangi Total COGM.
+     # Payment_Amnt juga dicatat/dialokasikan PER PRODUK; jangan deduplikasi pembayaran.
 
-    # Kolom ini harus dibuat sebelum digunakan untuk menghitung Margin Collection.
+     # Gross profit adalah penjualan tanpa PPN dikurangi Total COGM.
 
-    d["Gross_Profit"] = (
+     # Kolom ini harus dibuat sebelum digunakan untuk menghitung Margin Collection.
 
-        d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGM"]
+     d["Gross_Profit"] = (
 
-    )
+          d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGM"]
 
-    # Gross margin dihitung dari penjualan TANPA PPN karena PPN bukan pendapatan.
+     )
 
-    # Margin_Ratio = (Net Sales Excl PPN - Total COGM) / Net Sales Excl PPN.
+     # Gross margin dihitung dari penjualan TANPA PPN karena PPN bukan pendapatan.
 
-    d["Margin_Valid"] = (
+     # Margin_Ratio = (Net Sales Excl PPN - Total COGM) / Net Sales Excl PPN.
 
-        d["Net_Sales_Amnt_Excl_Ppn"].gt(0)
+     d["Margin_Valid"] = (
 
-        & d["Total_COGM"].ge(0)
+          d["Net_Sales_Amnt_Excl_Ppn"].gt(0)
 
-    )
+          & d["Total_COGM"].ge(0)
 
-    # Rasio biaya dan margin menggunakan basis penjualan tanpa PPN.
+     )
 
-    denom_excl_ppn = d["Net_Sales_Amnt_Excl_Ppn"].where(d["Margin_Valid"])
+     # Rasio biaya dan margin menggunakan basis penjualan tanpa PPN.
 
-    d["Cost_Ratio"] = (d["Total_COGM"] / denom_excl_ppn).fillna(0.0)
+     denom_excl_ppn = d["Net_Sales_Amnt_Excl_Ppn"].where(d["Margin_Valid"])
 
-    d["Margin_Ratio"] = (
+     d["Cost_Ratio"] = (d["Total_COGM"] / denom_excl_ppn).fillna(0.0)
 
-        (d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGM"]) / denom_excl_ppn
+     d["Margin_Ratio"] = (
 
-    ).fillna(0.0)
+          (d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGM"]) / denom_excl_ppn
 
-    # Rasio penjualan tanpa PPN terhadap penjualan termasuk PPN hanya
+     ).fillna(0.0)
 
-    # dipakai untuk estimasi pemisahan PPN dari pembayaran, bukan margin.
+     # Rasio penjualan tanpa PPN terhadap penjualan termasuk PPN hanya
 
-    denom_incl_ppn = d["Net_Sales_Amnt_Incl_Ppn"].where(
+     # dipakai untuk estimasi pemisahan PPN dari pembayaran, bukan margin.
 
-        d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
+     denom_incl_ppn = d["Net_Sales_Amnt_Incl_Ppn"].where(
 
-    )
+          d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
 
-    d["Sales_Ratio"] = (
+     )
 
-        d["Net_Sales_Amnt_Excl_Ppn"] / denom_incl_ppn
+     d["Sales_Ratio"] = (
 
-    ).fillna(0.0)
+          d["Net_Sales_Amnt_Excl_Ppn"] / denom_incl_ppn
 
-    # Margin Collection adalah bagian Gross Profit yang sudah terealisasi
+     ).fillna(0.0)
 
-    # melalui pembayaran customer. Karena Payment_Amnt termasuk PPN,
+     # Margin Collection adalah bagian Gross Profit yang sudah terealisasi
 
-    # rasio pembayaran dibandingkan dengan nilai penjualan termasuk PPN.
+     # melalui pembayaran customer. Karena Payment_Amnt termasuk PPN,
 
-    # Jika lunas 100%, Margin Collection sama dengan Gross Profit.
+     # rasio pembayaran dibandingkan dengan nilai penjualan termasuk PPN.
 
-    # Jika dibayar sebagian, Gross Profit diakui secara proporsional.
+     # Jika lunas 100%, Margin Collection sama dengan Gross Profit.
 
-    # Rasio dibatasi 0-100% agar kelebihan bayar tidak membuat margin melebihi
+     # Jika dibayar sebagian, Gross Profit diakui secara proporsional.
 
-    # Gross Profit invoice/produk. Pembayaran negatif tidak masuk Collection Aktual.
+     # Rasio dibatasi 0-100% agar kelebihan bayar tidak membuat margin melebihi
 
-    denom_payment = d["Net_Sales_Amnt_Incl_Ppn"].where(
+     # Gross Profit invoice/produk. Pembayaran negatif tidak masuk Collection Aktual.
 
-        d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
+     denom_payment = d["Net_Sales_Amnt_Incl_Ppn"].where(
 
-    )
+          d["Net_Sales_Amnt_Incl_Ppn"].gt(0)
 
-    d["Collection_Ratio"] = (
+     )
 
-        d["Pembayaran"] / denom_payment
+     d["Collection_Ratio"] = (
 
-    ).replace([float("inf"), -float("inf")], 0).fillna(0).clip(lower=0, upper=1)
+          d["Pembayaran"] / denom_payment
 
-    d["Pembayaran_Raw"] = d["Pembayaran"]
+     ).replace([float("inf"), -float("inf")], 0).fillna(0).clip(lower=0, upper=1)
 
-    d["Payment_Repeat_Item"] = False
+     d["Pembayaran_Raw"] = d["Pembayaran"]
 
-    d["Item_Replicated_By_Payment"] = False
+     d["Payment_Repeat_Item"] = False
 
-    d["Margin_Pembayaran"] = d["Gross_Profit"] * d["Collection_Ratio"]
+     d["Item_Replicated_By_Payment"] = False
 
-    # Estimasi COGM dan PPN yang terealisasi mengikuti proporsi pembayaran.
+     d["Margin_Pembayaran"] = d["Gross_Profit"] * d["Collection_Ratio"]
 
-    d["COGM_Pembayaran"] = d["Total_COGM"] * d["Collection_Ratio"]
+     # Estimasi COGM dan PPN yang terealisasi mengikuti proporsi pembayaran.
 
-    d["PPN_Pembayaran"] = d["Pembayaran"] * (1 - d["Sales_Ratio"])
+     d["COGM_Pembayaran"] = d["Total_COGM"] * d["Collection_Ratio"]
 
-    return d
+     d["PPN_Pembayaran"] = d["Pembayaran"] * (1 - d["Sales_Ratio"])
+
+     return d
 
 def create_summary_pdf(table, period, totals, filters):
 
-    """Buat PDF ringkasan per customer; tanpa Excel/CSV."""
+     """Buat PDF ringkasan per customer; tanpa Excel/CSV."""
 
-    from io import BytesIO
+     from io import BytesIO
 
-    from xml.sax.saxutils import escape
+     from xml.sax.saxutils import escape
 
-    from reportlab.lib import colors
+     from reportlab.lib import colors
 
-    from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+     from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 
-    from reportlab.lib.pagesizes import A4, landscape
+     from reportlab.lib.pagesizes import A4, landscape
 
-    from reportlab.lib.styles import ParagraphStyle
+     from reportlab.lib.styles import ParagraphStyle
 
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, LongTable, TableStyle, Spacer, KeepTogether
+     from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, LongTable, TableStyle, Spacer, KeepTogether
 
-    from reportlab.pdfbase import pdfmetrics
+     from reportlab.pdfbase import pdfmetrics
 
-    from reportlab.pdfbase.ttfonts import TTFont
+     from reportlab.pdfbase.ttfonts import TTFont
 
-    import os
+     import os
 
-    font = "Helvetica"
+     font = "Helvetica"
 
-    font_bold = "Helvetica-Bold"
+     font_bold = "Helvetica-Bold"
 
-    font_candidates = [
+     font_candidates = [
 
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+          ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
 
-        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+          ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
 
-    ]
+     ]
 
-    for regular_path, bold_path in font_candidates:
+     for regular_path, bold_path in font_candidates:
 
-        if os.path.isfile(regular_path) and os.path.isfile(bold_path):
+          if os.path.isfile(regular_path) and os.path.isfile(bold_path):
 
-            try:
+               try:
 
-                pdfmetrics.registerFont(TTFont("CollectionBody", regular_path))
+                    pdfmetrics.registerFont(TTFont("CollectionBody", regular_path))
 
-                pdfmetrics.registerFont(TTFont("CollectionBold", bold_path))
+                    pdfmetrics.registerFont(TTFont("CollectionBold", bold_path))
 
-                font, font_bold = "CollectionBody", "CollectionBold"
+                    font, font_bold = "CollectionBody", "CollectionBold"
 
-                break
+                    break
 
-            except Exception:
+               except Exception:
 
-                pass
+                    pass
 
-    buf = BytesIO()
+     buf = BytesIO()
 
-    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=29,
+     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=29,
 
-                            rightMargin=29, topMargin=36, bottomMargin=38)
+                                   rightMargin=29, topMargin=36, bottomMargin=38)
 
-    available_width = landscape(A4)[0] - 58
+     available_width = landscape(A4)[0] - 58
 
-    style_title = ParagraphStyle("title", fontName=font_bold, fontSize=15, leading=19, spaceAfter=8)
+     style_title = ParagraphStyle("title", fontName=font_bold, fontSize=15, leading=19, spaceAfter=8)
 
-    style_text = ParagraphStyle("body", fontName=font, fontSize=8, leading=11)
+     style_text = ParagraphStyle("body", fontName=font, fontSize=8, leading=11)
 
-    style_small = ParagraphStyle("small", fontName=font, fontSize=7.2, leading=10)
+     style_small = ParagraphStyle("small", fontName=font, fontSize=7.2, leading=10)
 
-    style_name = ParagraphStyle("name", parent=style_small, alignment=TA_LEFT)
+     style_name = ParagraphStyle("name", parent=style_small, alignment=TA_LEFT)
 
-    style_money = ParagraphStyle("money", parent=style_small, alignment=TA_RIGHT)
+     style_money = ParagraphStyle("money", parent=style_small, alignment=TA_RIGHT)
 
-    style_header = ParagraphStyle("header", fontName=font_bold, fontSize=7.1, leading=9.2, textColor=colors.white)
+     style_header = ParagraphStyle("header", fontName=font_bold, fontSize=7.1, leading=9.2, textColor=colors.white)
 
-    elements = [
+     elements = [
 
-        Paragraph("RINGKASAN COLLECTION PER CUSTOMER", style_title),
+          Paragraph("RINGKASAN COLLECTION PER CUSTOMER", style_title),
 
-        Paragraph(f"Periode Collection: {escape(period)} | {escape(filters)}", style_text),
+          Paragraph(f"Periode Collection: {escape(period)} | {escape(filters)}", style_text),
 
-        Spacer(1, 11),
+          Spacer(1, 11),
 
-    ]
+     ]
 
-    kpi_labels = ["Tagihan jatuh tempo", "Collection aktual", "Outstanding saat ini", "Margin Collection"]
+     kpi_labels = ["Tagihan jatuh tempo", "Collection aktual", "Outstanding saat ini", "Margin Collection"]
 
-    kpi_values = [rupiah(n) for n in totals]
+     kpi_values = [rupiah(n) for n in totals]
 
-    kpis = Table([[Paragraph(escape(label), style_small) for label in kpi_labels],
+     kpis = Table([[Paragraph(escape(label), style_small) for label in kpi_labels],
 
-                  [Paragraph(f"<b>{escape(value)}</b>", style_money) for value in kpi_values]],
+                      [Paragraph(f"<b>{escape(value)}</b>", style_money) for value in kpi_values]],
 
-                 colWidths=[available_width/4]*4)
+                     colWidths=[available_width/4]*4)
 
-    kpis.setStyle(TableStyle([
+     kpis.setStyle(TableStyle([
 
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F2F5F8")),
+          ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F2F5F8")),
 
-        ("BOX", (0, 0), (-1, -1), .5, colors.HexColor("#D5DCE3")),
+          ("BOX", (0, 0), (-1, -1), .5, colors.HexColor("#D5DCE3")),
 
-        ("INNERGRID", (0, 0), (-1, -1), .25, colors.HexColor("#D5DCE3")),
+          ("INNERGRID", (0, 0), (-1, -1), .25, colors.HexColor("#D5DCE3")),
 
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
+          ("TOPPADDING", (0, 0), (-1, -1), 8),
 
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
 
-    ]))
+     ]))
 
-    elements.extend([kpis, Spacer(1, 13)])
+     elements.extend([kpis, Spacer(1, 13)])
 
-    headings = ["No.", "Customer", "Jatuh Tempo Belum Lunas", "Collection Aktual", "Outstanding", "Margin Collection"]
+     headings = ["No.", "Customer", "Jatuh Tempo Belum Lunas", "Collection Aktual", "Outstanding", "Margin Collection"]
 
-    data = [[Paragraph(escape(h), style_header) for h in headings]]
+     data = [[Paragraph(escape(h), style_header) for h in headings]]
 
-    for item in table.itertuples(index=False):
+     for item in table.itertuples(index=False):
 
-        data.append([
+          data.append([
 
-            Paragraph(str(item.No), style_small),
+               Paragraph(str(item.No), style_small),
 
-            Paragraph(escape(str(item.Customer)), style_name),
+               Paragraph(escape(str(item.Customer)), style_name),
 
-            Paragraph(escape(rupiah(item.Jatuh_Tempo_Belum_Lunas)), style_money),
+               Paragraph(escape(rupiah(item.Jatuh_Tempo_Belum_Lunas)), style_money),
 
-            Paragraph(escape(rupiah(item.Collection_Bulan)), style_money),
+               Paragraph(escape(rupiah(item.Collection_Bulan)), style_money),
 
-            Paragraph(escape(rupiah(item.Outstanding)), style_money),
+               Paragraph(escape(rupiah(item.Outstanding)), style_money),
 
-            Paragraph(escape(rupiah(item.Margin_Bulan)), style_money),
+               Paragraph(escape(rupiah(item.Margin_Bulan)), style_money),
 
-        ])
+          ])
 
-    widths = [31, 215, 137, 124, 125, available_width - 31 - 215 - 137 - 124 - 125]
+     widths = [31, 215, 137, 124, 125, available_width - 31 - 215 - 137 - 124 - 125]
 
-    grid = LongTable(data, colWidths=widths, repeatRows=1, hAlign="LEFT")
+     grid = LongTable(data, colWidths=widths, repeatRows=1, hAlign="LEFT")
 
-    grid.setStyle(TableStyle([
+     grid.setStyle(TableStyle([
 
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#183149")),
+          ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#183149")),
 
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+          ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
 
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F6F8FA")]),
+          ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F6F8FA")]),
 
-        ("LINEBELOW", (0, 0), (-1, 0), .6, colors.HexColor("#183149")),
+          ("LINEBELOW", (0, 0), (-1, 0), .6, colors.HexColor("#183149")),
 
-        ("LINEBELOW", (0, 1), (-1, -1), .2, colors.HexColor("#E2E6EA")),
+          ("LINEBELOW", (0, 1), (-1, -1), .2, colors.HexColor("#E2E6EA")),
 
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+          ("LEFTPADDING", (0, 0), (-1, -1), 6),
 
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+          ("RIGHTPADDING", (0, 0), (-1, -1), 6),
 
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
+          ("TOPPADDING", (0, 0), (-1, -1), 6),
 
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
 
-    ]))
+     ]))
 
-    elements.append(grid)
+     elements.append(grid)
 
-    elements.extend([
+     elements.extend([
 
-        Spacer(1, 12),
+          Spacer(1, 12),
 
-        Paragraph("Catatan: jatuh tempo dihitung dari Balance terkini untuk invoice dengan Jth_Tempo sampai akhir periode. "
+          Paragraph("Catatan: jatuh tempo dihitung dari Balance terkini untuk invoice dengan Jth_Tempo sampai akhir periode. "
 
-                  "Collection mengikuti Payment_Date bulan terpilih. Margin Collection = Gross Profit produk (penjualan tanpa PPN dikurangi COGM) dikalikan rasio pembayaran terhadap penjualan termasuk PPN, maksimal 100%. Jika invoice lunas, Margin Collection sama dengan Gross Profit. PPN tidak menjadi pendapatan.", style_small),
+                      "Collection mengikuti Payment_Date bulan terpilih. Margin Collection = Gross Profit produk (penjualan tanpa PPN dikurangi COGM) dikalikan rasio pembayaran terhadap penjualan termasuk PPN, maksimal 100%. Jika invoice lunas, Margin Collection sama dengan Gross Profit. PPN tidak menjadi pendapatan.", style_small),
 
-    ])
+     ])
 
-    def footer(canvas, pdf_doc):
+     def footer(canvas, pdf_doc):
 
-        canvas.setFont(font, 8)
+          canvas.setFont(font, 8)
 
-        canvas.setFillColor(colors.HexColor("#687782"))
+          canvas.setFillColor(colors.HexColor("#687782"))
 
-        canvas.drawString(29, 20, "Dashboard Collection - Khusus Direksi")
+          canvas.drawString(29, 20, "Dashboard Collection - Khusus Direksi")
 
-        canvas.drawRightString(landscape(A4)[0] - 29, 20, f"Halaman {pdf_doc.page}")
+          canvas.drawRightString(landscape(A4)[0] - 29, 20, f"Halaman {pdf_doc.page}")
 
-    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
 
-    return buf.getvalue()
+     return buf.getvalue()
 
 def fmt_table(df, cols):
 
-    d = df[cols].copy()
+     d = df[cols].copy()
 
-    for col in ["Tagihan", "Jatuh Tempo Belum Lunas", "Collection Aktual", "Outstanding", "Margin Collection", "Pembayaran Tercatat"]:
+     for col in ["Tagihan", "Jatuh Tempo Belum Lunas", "Collection Aktual", "Outstanding", "Margin Collection", "Pembayaran Tercatat"]:
 
-        if col in d:
+          if col in d:
 
-            d[col] = d[col].map(rupiah)
+               d[col] = d[col].map(rupiah)
 
-    return d
+     return d
 
 st.title("💳 Dashboard Collection")
 
 try:
 
-    with st.spinner("Memuat Data Collection..."):
+     with st.spinner("Memuat Data Collection..."):
 
-        raw = load_collection()
+          raw = load_collection()
 
-    if raw is None or raw.empty:
+     if raw is None or raw.empty:
 
-        st.warning("Data Collection kosong atau belum dapat dibaca.")
+          st.warning("Data Collection kosong atau belum dapat dibaca.")
 
-        st.stop()
+          st.stop()
 
-    df = prepare(raw)
+     df = prepare(raw)
 
 except Exception as exc:
 
-    st.error(f"Gagal memproses data Collection: {exc}")
+     st.error(f"Gagal memproses data Collection: {exc}")
 
-    st.stop()
+     st.stop()
 
 if df.empty:
 
-    st.warning("Tidak ada data yang sesuai.")
+     st.warning("Tidak ada data yang sesuai.")
 
-    st.stop()
+     st.stop()
 
 # Pilihan Periode Collection murni kalender, tidak bergantung pada data transaksi.
+
 # Bulan pertama bisa disesuaikan tanpa membaca Payment_Date atau Jth_Tempo.
+
 current_month = pd.Timestamp.today().to_period("M")
+
 first_calendar_month = pd.Period("2020-01", freq="M")
+
 periods = [
-    p.strftime("%Y%m")
-    for p in pd.period_range(first_calendar_month, current_month, freq="M")
+
+     p.strftime("%Y%m")
+
+     for p in pd.period_range(first_calendar_month, current_month, freq="M")
+
 ][::-1]
+
 default = current_month.strftime("%Y%m")
 
 # Penting: sumber tab 2025 mungkin tidak memuat tagihan/pembayaran tahun 2026.
@@ -531,49 +540,49 @@ latest_dates = pd.concat([df["Jth_Tempo"], df["Payment_Date"], df["Tgl_Inv"]]).d
 
 if not latest_dates.empty and latest_dates.max().year < current_month.year:
 
-    st.warning(
+     st.warning(
 
-        f"Data Collection yang dimuat memiliki tanggal terakhir {latest_dates.max():%d-%m-%Y}. "
+          f"Data Collection yang dimuat memiliki tanggal terakhir {latest_dates.max():%d-%m-%Y}. "
 
-        f"KPI sampai {current_month.end_time:%d-%m-%Y} tidak akan lengkap bila "
+          f"KPI sampai {current_month.end_time:%d-%m-%Y} tidak akan lengkap bila "
 
-        "transaksi tahun berjalan berada di tab/file lain."
+          "transaksi tahun berjalan berada di tab/file lain."
 
-    )
+     )
 
 with st.expander("🔎 Filter Collection", expanded=True):
 
-    left, right = st.columns(2)
+     left, right = st.columns(2)
 
-    with left:
+     with left:
 
-        period = st.selectbox("Periode Collection", periods, index=periods.index(default) if default in periods else 0)
+          period = st.selectbox("Periode Collection", periods, index=periods.index(default) if default in periods else 0)
 
-        branches = st.multiselect("Branch", sorted(x for x in df["Branch"].unique() if x))
+          branches = st.multiselect("Branch", sorted(x for x in df["Branch"].unique() if x))
 
-    with right:
+     with right:
 
-        sales = st.multiselect("Sales", sorted(x for x in df["Sales_Name"].unique() if x))
+          sales = st.multiselect("Sales", sorted(x for x in df["Sales_Name"].unique() if x))
 
-        query = st.text_input("Cari Customer / Invoice", placeholder="Ketik customer atau nomor invoice")
+          query = st.text_input("Cari Customer / Invoice", placeholder="Ketik customer atau nomor invoice")
 
 filtered = df.copy()
 
 if branches:
 
-    filtered = filtered[filtered["Branch"].isin(branches)]
+     filtered = filtered[filtered["Branch"].isin(branches)]
 
 if sales:
 
-    filtered = filtered[filtered["Sales_Name"].isin(sales)]
+     filtered = filtered[filtered["Sales_Name"].isin(sales)]
 
 if query.strip():
 
-    found = filtered["Customer"].str.contains(query.strip(), case=False, regex=False, na=False) | filtered["Invoice_ID"].str.contains(query.strip(), case=False, regex=False, na=False)
+     found = filtered["Customer"].str.contains(query.strip(), case=False, regex=False, na=False) | filtered["Invoice_ID"].str.contains(query.strip(), case=False, regex=False, na=False)
 
-    selected_names = filtered.loc[found, "Customer"].unique()
+     selected_names = filtered.loc[found, "Customer"].unique()
 
-    filtered = filtered[filtered["Customer"].isin(selected_names)]
+     filtered = filtered[filtered["Customer"].isin(selected_names)]
 
 # Pilihan customer ditampilkan DI BAWAH ringkasan seperti versi awal.
 
@@ -593,15 +602,15 @@ customer_widget_key = "collection_detail_customer_selection"
 
 if customer_widget_key not in st.session_state:
 
-    st.session_state[customer_widget_key] = []
+     st.session_state[customer_widget_key] = []
 
 # Hindari opsi pilihan yang sudah tidak tersedia setelah filter Branch/Sales.
 
 st.session_state[customer_widget_key] = [
 
-    name for name in st.session_state[customer_widget_key]
+     name for name in st.session_state[customer_widget_key]
 
-    if name in customer_options
+     if name in customer_options
 
 ]
 
@@ -609,16 +618,31 @@ selected_customers = list(st.session_state[customer_widget_key])
 
 if selected_customers:
 
-    filtered = filtered[filtered["Customer"].isin(selected_customers)].copy()
+     filtered = filtered[filtered["Customer"].isin(selected_customers)].copy()
 
 selected_period = pd.Period(pd.to_datetime(period, format="%Y%m"), freq="M")
+
 start = selected_period.start_time
 
 end = selected_period.end_time
 
 filtered = filtered.copy()
 
-filtered["Jatuh_Tempo_Belum_Lunas"] = filtered["Outstanding"].where(filtered["Jth_Tempo"].notna() & filtered["Jth_Tempo"].le(end), 0.0)
+due_this_month = (
+    filtered["Jth_Tempo"].notna()
+    & filtered["Jth_Tempo"].between(start, end, inclusive="both")
+)
+overdue_previous_months = (
+    filtered["Jth_Tempo"].notna()
+    & filtered["Jth_Tempo"].lt(start)
+)
+filtered["Jatuh_Tempo_Belum_Lunas"] = 0.0
+filtered.loc[due_this_month, "Jatuh_Tempo_Belum_Lunas"] = filtered.loc[
+    due_this_month, "Net_Sales_Amnt_Incl_Ppn"
+]
+filtered.loc[overdue_previous_months, "Jatuh_Tempo_Belum_Lunas"] = filtered.loc[
+    overdue_previous_months, "Outstanding"
+]
 
 filtered["Collection_Bulan"] = filtered["Pembayaran"].where(filtered["Payment_Date"].between(start, end), 0.0)
 
@@ -654,21 +678,21 @@ b.metric("Margin Collection",rupiah(margin_amount))
 
 if filtered.empty:
 
-    st.warning("Tidak ada customer sesuai filter.")
+     st.warning("Tidak ada customer sesuai filter.")
 
-    st.stop()
+     st.stop()
 
 summary_all = filtered.groupby("Customer", as_index=False).agg(
 
-    Tagihan=("Tagihan", "sum"),
+     Tagihan=("Tagihan", "sum"),
 
-    Jatuh_Tempo_Belum_Lunas=("Jatuh_Tempo_Belum_Lunas", "sum"),
+     Jatuh_Tempo_Belum_Lunas=("Jatuh_Tempo_Belum_Lunas", "sum"),
 
-    Collection_Bulan=("Collection_Bulan", "sum"),
+     Collection_Bulan=("Collection_Bulan", "sum"),
 
-    Outstanding=("Outstanding", "sum"),
+     Outstanding=("Outstanding", "sum"),
 
-    Margin_Bulan=("Margin_Bulan", "sum"),
+     Margin_Bulan=("Margin_Bulan", "sum"),
 
 )
 
@@ -680,11 +704,11 @@ summary = summary_all.loc[summary_all["Outstanding"] > 0.009].copy()
 
 summary = summary.sort_values(
 
-    ["Customer"],
+     ["Customer"],
 
-    ascending=[True],
+     ascending=[True],
 
-    key=lambda col: col.astype(str).str.casefold(),
+     key=lambda col: col.astype(str).str.casefold(),
 
 ).reset_index(drop=True)
 
@@ -692,9 +716,9 @@ summary.insert(0, "No", range(1, len(summary) + 1))
 
 summary_export = summary.rename(columns={
 
-    "No": "No.", "Jatuh_Tempo_Belum_Lunas": "Jatuh Tempo Belum Lunas",
+     "No": "No.", "Jatuh_Tempo_Belum_Lunas": "Jatuh Tempo Belum Lunas",
 
-    "Collection_Bulan": "Collection Aktual", "Margin_Bulan": "Margin Collection",
+     "Collection_Bulan": "Collection Aktual", "Margin_Bulan": "Margin Collection",
 
 })
 
@@ -702,59 +726,59 @@ st.subheader("Ringkasan per Customer — Masih Memiliki Tagihan")
 
 if summary.empty:
 
-    st.info("Tidak ada customer dengan sisa tagihan pada pilihan filter ini.")
+     st.info("Tidak ada customer dengan sisa tagihan pada pilihan filter ini.")
 
 else:
 
-    st.dataframe(fmt_table(
+     st.dataframe(fmt_table(
 
-        summary_export,
+          summary_export,
 
-        ["No.", "Customer", "Jatuh Tempo Belum Lunas", "Collection Aktual", "Outstanding"] + ["Margin Collection"],
+          ["No.", "Customer", "Jatuh Tempo Belum Lunas", "Collection Aktual", "Outstanding"] + ["Margin Collection"],
 
-    ), width="stretch", hide_index=True)
+     ), width="stretch", hide_index=True)
 
 if not summary.empty:
 
-    try:
+     try:
 
-        summary_pdf = create_summary_pdf(
+          summary_pdf = create_summary_pdf(
 
-            summary, period,
+               summary, period,
 
-            (
+               (
 
-                filtered["Jatuh_Tempo_Belum_Lunas"].sum(),
+                    filtered["Jatuh_Tempo_Belum_Lunas"].sum(),
 
-                collection_amount,
+                    collection_amount,
 
-                filtered["Outstanding"].sum(),
+                    filtered["Outstanding"].sum(),
 
-                margin_amount,
+                    margin_amount,
 
-            ),
+               ),
 
-            "Filter dashboard yang sedang aktif",
+               "Filter dashboard yang sedang aktif",
 
-        )
+          )
 
-        st.download_button(
+          st.download_button(
 
-            "⬇️ Download Ringkasan Customer (PDF)",
+               "⬇️ Download Ringkasan Customer (PDF)",
 
-            data=summary_pdf,
+               data=summary_pdf,
 
-            file_name=f"ringkasan_collection_{period}.pdf",
+               file_name=f"ringkasan_collection_{period}.pdf",
 
-            mime="application/pdf",
+               mime="application/pdf",
 
-            key="download_summary_collection_pdf",
+               key="download_summary_collection_pdf",
 
-        )
+          )
 
-    except Exception as exc:
+     except Exception as exc:
 
-        st.error(f"Gagal membuat PDF ringkasan: {exc}")
+          st.error(f"Gagal membuat PDF ringkasan: {exc}")
 
 st.divider()
 
@@ -762,21 +786,21 @@ st.subheader("Detail Invoice Customer")
 
 st.multiselect(
 
-    "Customer",
+     "Customer",
 
-    options=customer_options,
+     options=customer_options,
 
-    key=customer_widget_key,
+     key=customer_widget_key,
 
-    placeholder="Pilih satu atau beberapa customer",
+     placeholder="Pilih satu atau beberapa customer",
 
 )
 
 if not selected_customers:
 
-    st.info("Pilih customer untuk melihat dua tabel: Collection dan Tagihan.")
+     st.info("Pilih customer untuk melihat dua tabel: Collection dan Tagihan.")
 
-    st.stop()
+     st.stop()
 
 # Filter customer dari kode utama sudah diterapkan sebelum menghitung KPI.
 
@@ -784,481 +808,484 @@ if not selected_customers:
 
 def tanggal_tergabung(values):
 
-    dates = pd.Series(values).dropna().drop_duplicates().sort_values()
+     dates = pd.Series(values).dropna().drop_duplicates().sort_values()
 
-    return ", ".join(dates.dt.strftime("%d-%m-%Y")) if not dates.empty else "—"
+     return ", ".join(dates.dt.strftime("%d-%m-%Y")) if not dates.empty else "—"
 
 def bentuk_tabel_invoice(rows, pembayaran_only=False):
 
-    """Satu baris per customer + perusahaan + cabang + invoice."""
+     """Satu baris per customer + perusahaan + cabang + invoice."""
 
-    if rows.empty:
+     if rows.empty:
 
-        return pd.DataFrame(columns=[
+          return pd.DataFrame(columns=[
 
-            "Customer", "Company", "Branch", "Invoice_ID", "Tgl_Inv",
+               "Customer", "Company", "Branch", "Invoice_ID", "Tgl_Inv",
 
-            "Jth_Tempo", "Total_Amnt", "Ppn", "Payment_Date",
+               "Jth_Tempo", "Total_Amnt", "Ppn", "Payment_Date",
 
-            "Payment_Amnt", "Balance", "Payment_Date_Sort",
+               "Payment_Amnt", "Balance", "Payment_Date_Sort",
 
-        ])
+          ])
 
-    if pembayaran_only:
+     if pembayaran_only:
 
-        # Tanggal dan nominal hanya pembayaran pada bulan pilihan.
+          # Tanggal dan nominal hanya pembayaran pada bulan pilihan.
 
-        # Informasi total invoice dan balance tetap diperoleh dari seluruh baris.
+          # Informasi total invoice dan balance tetap diperoleh dari seluruh baris.
 
-        base = filtered.groupby(
+          base = filtered.groupby(
 
-            ["Customer", "Company", "Branch", "Invoice_ID"],
+               ["Customer", "Company", "Branch", "Invoice_ID"],
 
-            as_index=False, dropna=False,
+               as_index=False, dropna=False,
 
-        ).agg(
+          ).agg(
 
-            Tgl_Inv=("Tgl_Inv", "min"),
+               Tgl_Inv=("Tgl_Inv", "min"),
 
-            Jth_Tempo=("Jth_Tempo", "max"),
+               Jth_Tempo=("Jth_Tempo", "max"),
 
-            Total_Amnt=("Total_Amnt", "sum"),
+               Total_Amnt=("Total_Amnt", "sum"),
 
-            Ppn=("Ppn", "sum"),
+               Ppn=("Ppn", "sum"),
 
-            Total_COGM=("Total_COGM", "sum"),
+               Total_COGM=("Total_COGM", "sum"),
 
-            Balance=("Outstanding", "sum"),
+               Balance=("Outstanding", "sum"),
 
-        )
+          )
 
-        paid = rows.groupby(
+          paid = rows.groupby(
 
-            ["Customer", "Company", "Branch", "Invoice_ID"],
+               ["Customer", "Company", "Branch", "Invoice_ID"],
 
-            as_index=False, dropna=False,
+               as_index=False, dropna=False,
 
-        ).agg(
+          ).agg(
 
-            Payment_Date=("Payment_Date", tanggal_tergabung),
+               Payment_Date=("Payment_Date", tanggal_tergabung),
 
-            Payment_Date_Sort=("Payment_Date", "max"),
+               Payment_Date_Sort=("Payment_Date", "max"),
 
-            Payment_Amnt=("Collection_Bulan", "sum"),
+               Payment_Amnt=("Collection_Bulan", "sum"),
 
-            Margin_Collection=("Margin_Bulan", "sum"),
+               Margin_Collection=("Margin_Bulan", "sum"),
 
-        )
+          )
 
-        return base.merge(paid, on=["Customer", "Company", "Branch", "Invoice_ID"], how="inner")
+          return base.merge(paid, on=["Customer", "Company", "Branch", "Invoice_ID"], how="inner")
 
-    return rows.groupby(
+     return rows.groupby(
 
-        ["Customer", "Company", "Branch", "Invoice_ID"],
+          ["Customer", "Company", "Branch", "Invoice_ID"],
 
-        as_index=False, dropna=False,
+          as_index=False, dropna=False,
 
-    ).agg(
+     ).agg(
 
-        Tgl_Inv=("Tgl_Inv", "min"),
+          Tgl_Inv=("Tgl_Inv", "min"),
 
-        Jth_Tempo=("Jth_Tempo", "max"),
+          Jth_Tempo=("Jth_Tempo", "max"),
 
-        Total_Amnt=("Total_Amnt", "sum"),
+          Total_Amnt=("Total_Amnt", "sum"),
 
-        Ppn=("Ppn", "sum"),
+          Ppn=("Ppn", "sum"),
 
-        Payment_Date=("Payment_Date", tanggal_tergabung),
+          Payment_Date=("Payment_Date", tanggal_tergabung),
 
-        Payment_Amnt=("Payment_Amnt", "sum"),
+          Payment_Amnt=("Payment_Amnt", "sum"),
 
-        Balance=("Outstanding", "sum"),
+          Balance=("Outstanding", "sum"),
 
-    )
+     )
 
 def tampilkan_invoice(data, sort_cols, ascending):
 
-    display = data.sort_values(
+     display = data.sort_values(
 
-        sort_cols, ascending=ascending, na_position="last"
+          sort_cols, ascending=ascending, na_position="last"
 
-    ).reset_index(drop=True).copy()
+     ).reset_index(drop=True).copy()
 
-    display = display.rename(columns={
+     display = display.rename(columns={
 
-        "Invoice_ID": "No. Invoice",
+          "Invoice_ID": "No. Invoice",
 
-        "Tgl_Inv": "Tanggal Invoice",
+          "Tgl_Inv": "Tanggal Invoice",
 
-        "Jth_Tempo": "Jatuh Tempo",
+          "Jth_Tempo": "Jatuh Tempo",
 
-        "Total_Amnt": "Total Amount",
+          "Total_Amnt": "Total Amount",
 
-        "Ppn": "PPN",
+          "Ppn": "PPN",
 
-        "Payment_Date": "Payment Date",
+          "Payment_Date": "Payment Date",
 
-        "Payment_Amnt": "Payment Amount",
+          "Payment_Amnt": "Payment Amount",
+        "Total Tagihan Customer": "Total Tagihan Customer",
 
-        "Margin_Collection": "Margin Collection",
+          "Margin_Collection": "Margin Collection",
 
-        "Total_COGM": "Total COGM",
+          "Total_COGM": "Total COGM",
 
-        "Balance": "Balance",
+          "Balance": "Balance",
 
-    })
+     })
 
-    for col in ["Tanggal Invoice", "Jatuh Tempo"]:
+     for col in ["Tanggal Invoice", "Jatuh Tempo"]:
 
-        display[col] = pd.to_datetime(display[col], errors="coerce").dt.strftime("%d-%m-%Y").fillna("—")
+          display[col] = pd.to_datetime(display[col], errors="coerce").dt.strftime("%d-%m-%Y").fillna("—")
 
-    for col in ["Total Amount", "PPN", "Payment Amount", "Total COGM", "Margin Collection", "Balance"]:
+     for col in ["Total Amount", "PPN", "Payment Amount", "Total Tagihan Customer", "Total COGM", "Margin Collection", "Balance"]:
 
-        if col in display.columns:
+          if col in display.columns:
 
-            display[col] = display[col].map(rupiah)
+               display[col] = display[col].map(rupiah)
 
-    display.insert(0, "No.", range(1, len(display) + 1))
+     display.insert(0, "No.", range(1, len(display) + 1))
 
-    output_cols = [
+     output_cols = [
 
-        "No.", "Customer", "No. Invoice", "Tanggal Invoice", "Jatuh Tempo",
+          "No.", "Customer", "No. Invoice", "Tanggal Invoice", "Jatuh Tempo",
 
-        "Company", "Branch", "Total Amount", "PPN", "Payment Date",
+          "Company", "Branch", "Total Amount", "PPN", "Payment Date",
 
-        "Payment Amount",
+          "Payment Amount",
 
-    ]
+     ]
+     if "Total Tagihan Customer" in display.columns:
+          output_cols.append("Total Tagihan Customer")
 
-    # Kolom ini hanya tersedia pada tabel Collection Customer.
+     # Kolom ini hanya tersedia pada tabel Collection Customer.
 
-    if "Total COGM" in display.columns:
+     if "Total COGM" in display.columns:
 
-        output_cols.append("Total COGM")
+          output_cols.append("Total COGM")
 
-    if "Margin Collection" in display.columns:
+     if "Margin Collection" in display.columns:
 
-        output_cols.append("Margin Collection")
+          output_cols.append("Margin Collection")
 
-    output_cols.append("Balance")
+     output_cols.append("Balance")
 
-    return display[output_cols]
+     return display[output_cols]
 
 def create_tagihan_pdf(display_table, periode, balance_total, customer_names):
 
-    """Ekspor tampilan tabel tagihan ke PDF landscape A3 (multi-halaman)."""
+     """Ekspor tampilan tabel tagihan ke PDF landscape A3 (multi-halaman)."""
 
-    from io import BytesIO
+     from io import BytesIO
 
-    from xml.sax.saxutils import escape
+     from xml.sax.saxutils import escape
 
-    from reportlab.lib import colors
+     from reportlab.lib import colors
 
-    from reportlab.lib.pagesizes import A3, landscape
+     from reportlab.lib.pagesizes import A3, landscape
 
-    from reportlab.lib.styles import ParagraphStyle
+     from reportlab.lib.styles import ParagraphStyle
 
-    from reportlab.pdfbase import pdfmetrics
+     from reportlab.pdfbase import pdfmetrics
 
-    from reportlab.pdfbase.ttfonts import TTFont
+     from reportlab.pdfbase.ttfonts import TTFont
 
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, LongTable, TableStyle, Spacer
+     from reportlab.platypus import SimpleDocTemplate, Paragraph, LongTable, TableStyle, Spacer
 
-    import os
+     import os
 
-    regular, bold = "Helvetica", "Helvetica-Bold"
+     regular, bold = "Helvetica", "Helvetica-Bold"
 
-    for font_normal, font_heavy in [
+     for font_normal, font_heavy in [
 
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+          ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
 
-        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+          ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
 
-    ]:
+     ]:
 
-        if os.path.isfile(font_normal) and os.path.isfile(font_heavy):
+          if os.path.isfile(font_normal) and os.path.isfile(font_heavy):
 
-            try:
+               try:
 
-                pdfmetrics.registerFont(TTFont("TagihanRegular", font_normal))
+                    pdfmetrics.registerFont(TTFont("TagihanRegular", font_normal))
 
-                pdfmetrics.registerFont(TTFont("TagihanBold", font_heavy))
+                    pdfmetrics.registerFont(TTFont("TagihanBold", font_heavy))
 
-                regular, bold = "TagihanRegular", "TagihanBold"
+                    regular, bold = "TagihanRegular", "TagihanBold"
 
-                break
+                    break
 
-            except Exception:
+               except Exception:
 
-                pass
+                    pass
 
-    buffer = BytesIO()
+     buffer = BytesIO()
 
-    paper_width, _ = landscape(A3)
+     paper_width, _ = landscape(A3)
 
-    doc = SimpleDocTemplate(
+     doc = SimpleDocTemplate(
 
-        buffer, pagesize=landscape(A3), leftMargin=25, rightMargin=25,
+          buffer, pagesize=landscape(A3), leftMargin=25, rightMargin=25,
 
-        topMargin=38, bottomMargin=36,
+          topMargin=38, bottomMargin=36,
 
-    )
+     )
 
-    usable = paper_width - 50
+     usable = paper_width - 50
 
-    title_style = ParagraphStyle("TgTitle", fontName=bold, fontSize=15, leading=19, spaceAfter=10)
+     title_style = ParagraphStyle("TgTitle", fontName=bold, fontSize=15, leading=19, spaceAfter=10)
 
-    info_style = ParagraphStyle("TgInfo", fontName=regular, fontSize=8.5, leading=12, spaceAfter=7)
+     info_style = ParagraphStyle("TgInfo", fontName=regular, fontSize=8.5, leading=12, spaceAfter=7)
 
-    head_style = ParagraphStyle("TgHead", fontName=bold, textColor=colors.white, fontSize=7.0, leading=9)
+     head_style = ParagraphStyle("TgHead", fontName=bold, textColor=colors.white, fontSize=7.0, leading=9)
 
-    cell_style = ParagraphStyle("TgCell", fontName=regular, fontSize=6.9, leading=9)
+     cell_style = ParagraphStyle("TgCell", fontName=regular, fontSize=6.9, leading=9)
 
-    elements = [
+     elements = [
 
-        Paragraph("DAFTAR TAGIHAN CUSTOMER", title_style),
+          Paragraph("DAFTAR TAGIHAN CUSTOMER", title_style),
 
-        Paragraph("Periode pilihan: " + escape(str(periode)) + " | Customer: " + escape(", ".join(customer_names)), info_style),
+          Paragraph("Periode pilihan: " + escape(str(periode)) + " | Customer: " + escape(", ".join(customer_names)), info_style),
 
-        Paragraph("Tagihan: invoice dengan Balance &gt; 0 dan tanggal jatuh tempo sampai akhir periode pilihan. Diurutkan dari jatuh tempo terlama.", info_style),
+          Paragraph("Tagihan: seluruh invoice yang jatuh tempo pada bulan pilihan ditampilkan penuh termasuk PPN (sudah/belum dibayar), ditambah sisa Balance invoice bulan sebelumnya yang belum lunas.", info_style),
 
-        Spacer(1, 6),
+          Spacer(1, 6),
 
-    ]
+     ]
 
-    headers = list(display_table.columns)
+     headers = list(display_table.columns)
 
-    data = [[Paragraph(escape(str(h)), head_style) for h in headers]]
+     data = [[Paragraph(escape(str(h)), head_style) for h in headers]]
 
-    for values in display_table.itertuples(index=False, name=None):
+     for values in display_table.itertuples(index=False, name=None):
 
-        data.append([Paragraph(escape(str(v)) if v is not None else "", cell_style) for v in values])
+          data.append([Paragraph(escape(str(v)) if v is not None else "", cell_style) for v in values])
 
-    if len(data) == 1:
+     if len(data) == 1:
 
-        data.append([Paragraph("Tidak ada tagihan belum lunas", cell_style)] + ["" for _ in headers[1:]])
+          data.append([Paragraph("Tidak ada tagihan belum lunas", cell_style)] + ["" for _ in headers[1:]])
 
-    # 12 kolom: nomor, customer, invoice, tanggal invoice, jatuh tempo,
+     # 12 kolom: nomor, customer, invoice, tanggal invoice, jatuh tempo,
 
-    # company, branch, total amount, PPN, payment date, payment amount, balance.
+     # company, branch, total amount, PPN, payment date, payment amount, balance.
 
-    width_weights = [3, 14, 13, 8, 8, 7, 7, 10, 9, 10, 10, 11]
+     width_weights = [3, 14, 13, 8, 8, 7, 7, 10, 9, 10, 10, 11]
 
-    if len(headers) != len(width_weights):
+     if len(headers) != len(width_weights):
 
-        width_weights = [1] * len(headers)
+          width_weights = [1] * len(headers)
 
-    col_widths = [usable * x / sum(width_weights) for x in width_weights]
+     col_widths = [usable * x / sum(width_weights) for x in width_weights]
 
-    grid = LongTable(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+     grid = LongTable(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
 
-    grid.setStyle(TableStyle([
+     grid.setStyle(TableStyle([
 
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#19364C")),
+          ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#19364C")),
 
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F5F8")]),
+          ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F5F8")]),
 
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+          ("VALIGN", (0, 0), (-1, -1), "TOP"),
 
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
+          ("TOPPADDING", (0, 0), (-1, -1), 6),
 
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
 
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+          ("LEFTPADDING", (0, 0), (-1, -1), 4),
 
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+          ("RIGHTPADDING", (0, 0), (-1, -1), 4),
 
-        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#19364C")),
+          ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#19364C")),
 
-        ("LINEBELOW", (0, 1), (-1, -1), 0.2, colors.HexColor("#DEE4E9")),
+          ("LINEBELOW", (0, 1), (-1, -1), 0.2, colors.HexColor("#DEE4E9")),
 
-    ]))
+     ]))
 
-    elements.append(grid)
+     elements.append(grid)
 
-    elements.append(Spacer(1, 12))
+     elements.append(Spacer(1, 12))
 
-    elements.append(Paragraph("TOTAL TAGIHAN JATUH TEMPO: " + escape(rupiah(balance_total)), title_style))
+     elements.append(Paragraph("TOTAL TAGIHAN JATUH TEMPO: " + escape(rupiah(balance_total)), title_style))
 
-    elements.append(Paragraph(
+     elements.append(Paragraph(
 
-        "Catatan: nilai per invoice adalah penjumlahan baris sumber; validasi terhadap duplikasi nominal pada baris produk tetap diperlukan.",
+          "Catatan: nilai per invoice adalah penjumlahan baris sumber; validasi terhadap duplikasi nominal pada baris produk tetap diperlukan.",
 
-        info_style,
+          info_style,
 
-    ))
+     ))
 
-    def footer(canvas, pdf_doc):
+     def footer(canvas, pdf_doc):
 
-        canvas.setFont(regular, 8)
+          canvas.setFont(regular, 8)
 
-        canvas.setFillColor(colors.HexColor("#637381"))
+          canvas.setFillColor(colors.HexColor("#637381"))
 
-        canvas.drawString(25, 19, "Dashboard Collection | Tagihan Customer")
+          canvas.drawString(25, 19, "Dashboard Collection | Tagihan Customer")
 
-        canvas.drawRightString(paper_width - 25, 19, f"Halaman {pdf_doc.page}")
+          canvas.drawRightString(paper_width - 25, 19, f"Halaman {pdf_doc.page}")
 
-    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
 
-    return buffer.getvalue()
+     return buffer.getvalue()
 
 def create_collection_pdf(display_table, periode, payment_total, customer_names):
 
-    """Ekspor tampilan tabel collection ke PDF landscape A3 (multi-halaman)."""
+     """Ekspor tampilan tabel collection ke PDF landscape A3 (multi-halaman)."""
 
-    from io import BytesIO
+     from io import BytesIO
 
-    from xml.sax.saxutils import escape
+     from xml.sax.saxutils import escape
 
-    from reportlab.lib import colors
+     from reportlab.lib import colors
 
-    from reportlab.lib.pagesizes import A3, landscape
+     from reportlab.lib.pagesizes import A3, landscape
 
-    from reportlab.lib.styles import ParagraphStyle
+     from reportlab.lib.styles import ParagraphStyle
 
-    from reportlab.pdfbase import pdfmetrics
+     from reportlab.pdfbase import pdfmetrics
 
-    from reportlab.pdfbase.ttfonts import TTFont
+     from reportlab.pdfbase.ttfonts import TTFont
 
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, LongTable, TableStyle, Spacer
+     from reportlab.platypus import SimpleDocTemplate, Paragraph, LongTable, TableStyle, Spacer
 
-    import os
+     import os
 
-    regular, bold = "Helvetica", "Helvetica-Bold"
+     regular, bold = "Helvetica", "Helvetica-Bold"
 
-    for font_normal, font_heavy in [
+     for font_normal, font_heavy in [
 
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+          ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
 
-        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+          ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
 
-    ]:
+     ]:
 
-        if os.path.isfile(font_normal) and os.path.isfile(font_heavy):
+          if os.path.isfile(font_normal) and os.path.isfile(font_heavy):
 
-            try:
+               try:
 
-                pdfmetrics.registerFont(TTFont("CollectionRegular", font_normal))
+                    pdfmetrics.registerFont(TTFont("CollectionRegular", font_normal))
 
-                pdfmetrics.registerFont(TTFont("CollectionBold", font_heavy))
+                    pdfmetrics.registerFont(TTFont("CollectionBold", font_heavy))
 
-                regular, bold = "CollectionRegular", "CollectionBold"
+                    regular, bold = "CollectionRegular", "CollectionBold"
 
-                break
+                    break
 
-            except Exception:
+               except Exception:
 
-                pass
+                    pass
 
-    buffer = BytesIO()
+     buffer = BytesIO()
 
-    paper_width, _ = landscape(A3)
+     paper_width, _ = landscape(A3)
 
-    doc = SimpleDocTemplate(
+     doc = SimpleDocTemplate(
 
-        buffer, pagesize=landscape(A3), leftMargin=25, rightMargin=25,
+          buffer, pagesize=landscape(A3), leftMargin=25, rightMargin=25,
 
-        topMargin=38, bottomMargin=36,
+          topMargin=38, bottomMargin=36,
 
-    )
+     )
 
-    usable = paper_width - 50
+     usable = paper_width - 50
 
-    title_style = ParagraphStyle("TgTitle", fontName=bold, fontSize=15, leading=19, spaceAfter=10)
+     title_style = ParagraphStyle("TgTitle", fontName=bold, fontSize=15, leading=19, spaceAfter=10)
 
-    info_style = ParagraphStyle("TgInfo", fontName=regular, fontSize=8.5, leading=12, spaceAfter=7)
+     info_style = ParagraphStyle("TgInfo", fontName=regular, fontSize=8.5, leading=12, spaceAfter=7)
 
-    head_style = ParagraphStyle("TgHead", fontName=bold, textColor=colors.white, fontSize=7.0, leading=9)
+     head_style = ParagraphStyle("TgHead", fontName=bold, textColor=colors.white, fontSize=7.0, leading=9)
 
-    cell_style = ParagraphStyle("TgCell", fontName=regular, fontSize=6.9, leading=9)
+     cell_style = ParagraphStyle("TgCell", fontName=regular, fontSize=6.9, leading=9)
 
-    elements = [
+     elements = [
 
-        Paragraph("DAFTAR COLLECTION CUSTOMER", title_style),
+          Paragraph("DAFTAR COLLECTION CUSTOMER", title_style),
 
-        Paragraph("Periode pilihan: " + escape(str(periode)) + " | Customer: " + escape(", ".join(customer_names)), info_style),
+          Paragraph("Periode pilihan: " + escape(str(periode)) + " | Customer: " + escape(", ".join(customer_names)), info_style),
 
-        Paragraph("Collection: pembayaran dengan Payment Date pada periode pilihan. Diurutkan dari pembayaran terbaru.", info_style),
+          Paragraph("Collection: pembayaran dengan Payment Date pada periode pilihan. Diurutkan dari pembayaran terbaru.", info_style),
 
-        Spacer(1, 6),
+          Spacer(1, 6),
 
-    ]
+     ]
 
-    headers = list(display_table.columns)
+     headers = list(display_table.columns)
 
-    data = [[Paragraph(escape(str(h)), head_style) for h in headers]]
+     data = [[Paragraph(escape(str(h)), head_style) for h in headers]]
 
-    for values in display_table.itertuples(index=False, name=None):
+     for values in display_table.itertuples(index=False, name=None):
 
-        data.append([Paragraph(escape(str(v)) if v is not None else "", cell_style) for v in values])
+          data.append([Paragraph(escape(str(v)) if v is not None else "", cell_style) for v in values])
 
-    if len(data) == 1:
+     if len(data) == 1:
 
-        data.append([Paragraph("Tidak ada pembayaran dalam periode", cell_style)] + ["" for _ in headers[1:]])
+          data.append([Paragraph("Tidak ada pembayaran dalam periode", cell_style)] + ["" for _ in headers[1:]])
 
-    # 12 kolom: nomor, customer, invoice, tanggal invoice, jatuh tempo,
+     # 12 kolom: nomor, customer, invoice, tanggal invoice, jatuh tempo,
 
-    # company, branch, total amount, PPN, payment date, payment amount, balance.
+     # company, branch, total amount, PPN, payment date, payment amount, balance.
 
-    width_weights = [3, 14, 13, 8, 8, 7, 7, 10, 9, 10, 10, 11]
+     width_weights = [3, 14, 13, 8, 8, 7, 7, 10, 9, 10, 10, 11]
 
-    if len(headers) != len(width_weights):
+     if len(headers) != len(width_weights):
 
-        width_weights = [1] * len(headers)
+          width_weights = [1] * len(headers)
 
-    col_widths = [usable * x / sum(width_weights) for x in width_weights]
+     col_widths = [usable * x / sum(width_weights) for x in width_weights]
 
-    grid = LongTable(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+     grid = LongTable(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
 
-    grid.setStyle(TableStyle([
+     grid.setStyle(TableStyle([
 
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#19364C")),
+          ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#19364C")),
 
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F5F8")]),
+          ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F5F8")]),
 
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+          ("VALIGN", (0, 0), (-1, -1), "TOP"),
 
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
+          ("TOPPADDING", (0, 0), (-1, -1), 6),
 
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
 
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+          ("LEFTPADDING", (0, 0), (-1, -1), 4),
 
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+          ("RIGHTPADDING", (0, 0), (-1, -1), 4),
 
-        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#19364C")),
+          ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#19364C")),
 
-        ("LINEBELOW", (0, 1), (-1, -1), 0.2, colors.HexColor("#DEE4E9")),
+          ("LINEBELOW", (0, 1), (-1, -1), 0.2, colors.HexColor("#DEE4E9")),
 
-    ]))
+     ]))
 
-    elements.append(grid)
+     elements.append(grid)
 
-    elements.append(Spacer(1, 12))
+     elements.append(Spacer(1, 12))
 
-    elements.append(Paragraph("TOTAL COLLECTION CUSTOMER: " + escape(rupiah(payment_total)), title_style))
+     elements.append(Paragraph("TOTAL COLLECTION CUSTOMER: " + escape(rupiah(payment_total)), title_style))
 
-    elements.append(Paragraph(
+     elements.append(Paragraph(
 
-        "Catatan: nilai per invoice adalah penjumlahan baris sumber; validasi terhadap duplikasi nominal pada baris produk tetap diperlukan.",
+          "Catatan: nilai per invoice adalah penjumlahan baris sumber; validasi terhadap duplikasi nominal pada baris produk tetap diperlukan.",
 
-        info_style,
+          info_style,
 
-    ))
+     ))
 
-    def footer(canvas, pdf_doc):
+     def footer(canvas, pdf_doc):
 
-        canvas.setFont(regular, 8)
+          canvas.setFont(regular, 8)
 
-        canvas.setFillColor(colors.HexColor("#637381"))
+          canvas.setFillColor(colors.HexColor("#637381"))
 
-        canvas.drawString(25, 19, "Dashboard Collection | Collection Customer")
+          canvas.drawString(25, 19, "Dashboard Collection | Collection Customer")
 
-        canvas.drawRightString(paper_width - 25, 19, f"Halaman {pdf_doc.page}")
+          canvas.drawRightString(paper_width - 25, 19, f"Halaman {pdf_doc.page}")
 
-    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
 
-    return buffer.getvalue()
+     return buffer.getvalue()
 
 # TABEL 1: Collection: pembayaran positif yang jatuh pada bulan pilihan.
 
@@ -1270,25 +1297,25 @@ st.markdown("#### Collection Customer")
 
 st.caption(
 
-    f"Pembayaran masuk selama {start:%d-%m-%Y} s.d. {end:%d-%m-%Y}; "
+     f"Pembayaran masuk selama {start:%d-%m-%Y} s.d. {end:%d-%m-%Y}; "
 
-    "diurutkan dari Payment Date terbaru. Invoice dibayar sebagian tetap ditampilkan."
+     "diurutkan dari Payment Date terbaru. Invoice dibayar sebagian tetap ditampilkan."
 
 )
 
 if collection_invoices.empty:
 
-    st.info("Belum ada pembayaran pada bulan yang dipilih untuk customer ini.")
+     st.info("Belum ada pembayaran pada bulan yang dipilih untuk customer ini.")
 
 else:
 
-    st.dataframe(
+     st.dataframe(
 
-        tampilkan_invoice(collection_invoices, ["Payment_Date_Sort", "Invoice_ID"], [False, False]),
+          tampilkan_invoice(collection_invoices, ["Payment_Date_Sort", "Invoice_ID"], [False, False]),
 
-        width="stretch", hide_index=True,
+          width="stretch", hide_index=True,
 
-    )
+     )
 
 st.metric("Total Collection Customer", rupiah(collection_invoices["Payment_Amnt"].sum()))
 
@@ -1300,11 +1327,34 @@ st.divider()
 
 # Seluruh invoice Balance > 0 masuk tepat satu kategori.
 
-tagihan_rows = filtered.loc[filtered["Outstanding"].gt(0.009)].copy()
+# Semua invoice jatuh tempo bulan terpilih (lunas maupun belum) + tunggakan bulan sebelumnya.
+due_this_month_detail = (
+    filtered["Jth_Tempo"].notna()
+    & filtered["Jth_Tempo"].between(start, end, inclusive="both")
+)
+overdue_previous_detail = (
+    filtered["Jth_Tempo"].notna()
+    & filtered["Jth_Tempo"].lt(start)
+    & filtered["Outstanding"].gt(0.009)
+)
+tagihan_rows = filtered.loc[due_this_month_detail | overdue_previous_detail].copy()
 
 tagihan_invoices = bentuk_tabel_invoice(tagihan_rows)
 
-tagihan_invoices = tagihan_invoices.loc[tagihan_invoices["Balance"].gt(0.009)].copy()
+# Nilai tagihan per invoice untuk tabel Tagihan Customer:
+# - Jatuh tempo pada bulan terpilih: nilai penuh termasuk PPN.
+# - Jatuh tempo bulan sebelumnya: hanya sisa Balance yang belum dibayar.
+due_month_invoice = (
+    tagihan_invoices["Jth_Tempo"].notna()
+    & tagihan_invoices["Jth_Tempo"].between(start, end, inclusive="both")
+)
+tagihan_invoices["Total Tagihan Customer"] = tagihan_invoices["Balance"]
+tagihan_invoices.loc[due_month_invoice, "Total Tagihan Customer"] = (
+    tagihan_invoices.loc[due_month_invoice, "Total_Amnt"]
+    + tagihan_invoices.loc[due_month_invoice, "Ppn"]
+)
+
+# Jangan filter Balance di sini: invoice bulan terpilih yang sudah lunas tetap harus tampil.
 
 batas_jatuh_tempo = end.normalize()
 
@@ -1312,7 +1362,7 @@ tagihan_invoices["Jth_Tempo"] = pd.to_datetime(tagihan_invoices["Jth_Tempo"], er
 
 tagihan_invoices["Hari_Terlambat"] = (
 
-    (batas_jatuh_tempo - tagihan_invoices["Jth_Tempo"]).dt.days.clip(lower=0).fillna(0).astype(int)
+     (batas_jatuh_tempo - tagihan_invoices["Jth_Tempo"]).dt.days.clip(lower=0).fillna(0).astype(int)
 
 )
 
@@ -1326,9 +1376,9 @@ st.markdown("#### Tagihan Customer")
 
 st.caption(
 
-    f"Status jatuh tempo dihitung sampai {batas_jatuh_tempo:%d-%m-%Y} (akhir periode pilihan), "
+     f"Status jatuh tempo dihitung sampai {batas_jatuh_tempo:%d-%m-%Y} (akhir periode pilihan), "
 
-    "termasuk seluruh bulan sebelumnya. Hanya invoice dengan Balance > 0."
+     "Semua invoice jatuh tempo bulan terpilih ditampilkan penuh termasuk PPN (lunas maupun belum); invoice bulan sebelumnya ditampilkan sebesar sisa Balance."
 
 )
 
@@ -1338,29 +1388,29 @@ st.caption(
 
 def tampilkan_kategori_tagihan(data, judul, keterangan):
 
-    st.markdown(f"##### {judul}")
+     st.markdown(f"##### {judul}")
 
-    st.caption(keterangan)
+     st.caption(keterangan)
 
-    display = tampilkan_invoice(data, ["Jth_Tempo", "Invoice_ID"], [True, True])
+     display = tampilkan_invoice(data, ["Jth_Tempo", "Invoice_ID"], [True, True])
 
-    if data.empty:
+     if data.empty:
 
-        st.info("Tidak ada invoice pada kategori ini.")
+          st.info("Tidak ada invoice pada kategori ini.")
 
-    else:
+     else:
 
-        st.dataframe(display, width="stretch", hide_index=True)
+          st.dataframe(display, width="stretch", hide_index=True)
 
 # Yang paling lama lewat jatuh tempo berada di baris teratas.
 
 tampilkan_kategori_tagihan(
 
-    tagihan_invoices.loc[lewat_tempo].copy(),
+     tagihan_invoices.loc[lewat_tempo].copy(),
 
-    "Tagihan Sudah Jatuh Tempo",
+     "Tagihan Sudah Jatuh Tempo",
 
-    "Diurutkan dari tanggal jatuh tempo paling lama."
+     "Diurutkan dari tanggal jatuh tempo paling lama."
 
 )
 
@@ -1368,46 +1418,46 @@ st.divider()
 
 tampilkan_kategori_tagihan(
 
-    tagihan_invoices.loc[belum_tempo].copy(),
+     tagihan_invoices.loc[belum_tempo].copy(),
 
-    "Outstanding Belum Jatuh Tempo (Setelah Periode)",
+     "Outstanding Belum Jatuh Tempo (Setelah Periode)",
 
-    "Jatuh tempo setelah akhir bulan yang dipilih, diurutkan dari tanggal terdekat."
+     "Jatuh tempo setelah akhir bulan yang dipilih, diurutkan dari tanggal terdekat."
 
 )
 
 if tanpa_tempo.any():
 
-    st.caption("Ada invoice dengan tanggal jatuh tempo kosong/tidak valid; tidak dimasukkan ke tagihan jatuh tempo maupun PDF.")
+     st.caption("Ada invoice dengan tanggal jatuh tempo kosong/tidak valid; tidak dimasukkan ke tagihan jatuh tempo maupun PDF.")
 
 # Tetap sediakan PDF gabungan seperti versi dashboard sebelumnya.
 
 try:
 
-    gabungan = tampilkan_invoice(tagihan_invoices.loc[lewat_tempo].copy(), ["Jth_Tempo", "Invoice_ID"], [True, True])
+     gabungan = tampilkan_invoice(tagihan_invoices.loc[lewat_tempo].copy(), ["Jth_Tempo", "Invoice_ID"], [True, True])
 
-    pdf_gabungan = create_tagihan_pdf(gabungan, period, tagihan_invoices.loc[lewat_tempo, "Balance"].sum(), selected_customers)
+     pdf_gabungan = create_tagihan_pdf(gabungan, period, tagihan_invoices.loc[lewat_tempo, "Total Tagihan Customer"].sum(), selected_customers)
 
-    st.download_button(
+     st.download_button(
 
-        "⬇️ Download Tagihan Jatuh Tempo (PDF)", data=pdf_gabungan,
+          "⬇️ Download Tagihan Jatuh Tempo (PDF)", data=pdf_gabungan,
 
-        file_name=f"tagihan_customer_{period}.pdf", mime="application/pdf",
+          file_name=f"tagihan_customer_{period}.pdf", mime="application/pdf",
 
-        key="download_tagihan_invoice",
+          key="download_tagihan_invoice",
 
-    )
+     )
 
 except Exception as exc:
 
-    st.error(f"Gagal membuat PDF semua tagihan: {exc}")
+     st.error(f"Gagal membuat PDF semua tagihan: {exc}")
 
 st.caption(
 
-    "Catatan: angka per invoice merupakan penjumlahan baris sumber. "
+     "Catatan: angka per invoice merupakan penjumlahan baris sumber. "
 
-    "Pastikan Total Amount, PPN, Payment Amount, dan Balance tidak diduplikasi "
+     "Pastikan Total Amount, PPN, Payment Amount, dan Balance tidak diduplikasi "
 
-    "di beberapa baris produk pada spreadsheet."
+     "di beberapa baris produk pada spreadsheet."
 
 )

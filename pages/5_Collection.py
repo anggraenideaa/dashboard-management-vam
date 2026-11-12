@@ -1337,7 +1337,16 @@ overdue_previous_detail = (
     & filtered["Jth_Tempo"].lt(start)
     & filtered["Outstanding"].gt(0.009)
 )
-tagihan_rows = filtered.loc[due_this_month_detail | overdue_previous_detail].copy()
+# Outstanding setelah periode tetap ditampilkan pada Detail Customer,
+# tetapi tidak dimasukkan ke KPI Total Tagihan Jatuh Tempo.
+future_outstanding_detail = (
+    filtered["Jth_Tempo"].notna()
+    & filtered["Jth_Tempo"].gt(end)
+    & filtered["Outstanding"].gt(0.009)
+)
+tagihan_rows = filtered.loc[
+    due_this_month_detail | overdue_previous_detail | future_outstanding_detail
+].copy()
 
 tagihan_invoices = bentuk_tabel_invoice(tagihan_rows)
 
@@ -1378,7 +1387,7 @@ st.caption(
 
      f"Status jatuh tempo dihitung sampai {batas_jatuh_tempo:%d-%m-%Y} (akhir periode pilihan), "
 
-     "Semua invoice jatuh tempo bulan terpilih ditampilkan penuh termasuk PPN (lunas maupun belum); invoice bulan sebelumnya ditampilkan sebesar sisa Balance."
+     "Invoice jatuh tempo bulan terpilih ditampilkan penuh termasuk PPN (lunas maupun belum); tunggakan bulan sebelumnya dan outstanding setelah periode ditampilkan sebesar sisa Balance. Outstanding setelah periode tidak menambah KPI Total Tagihan Jatuh Tempo."
 
 )
 

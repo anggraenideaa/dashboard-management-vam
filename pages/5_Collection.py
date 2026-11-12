@@ -134,7 +134,7 @@ def prepare(source):
 
     d.columns = d.columns.map(lambda x: str(x).strip())
 
-    needed = ["Cust_Name", "Net_Ar", "Balance", "Jth_Tempo", "Payment_Date", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_COGS"]
+    needed = ["Cust_Name", "Net_Ar", "Balance", "Jth_Tempo", "Payment_Date", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_COGM"]
 
     absent = [x for x in needed if x not in d]
 
@@ -158,7 +158,7 @@ def prepare(source):
 
             raise ValueError(f"Kolom wajib detail invoice tidak ditemukan: {col}")
 
-    for col in ["Net_Ar", "Balance", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_Amnt", "Ppn", "Total_COGS"]:
+    for col in ["Net_Ar", "Balance", "Payment_Amnt", "Net_Sales_Amnt_Excl_Ppn", "Net_Sales_Amnt_Incl_Ppn", "Total_Amnt", "Ppn", "Total_COGM"]:
 
         d[col] = d[col].map(to_number)
 
@@ -195,29 +195,29 @@ def prepare(source):
 
     d["Pembayaran"] = d["Payment_Amnt"].where(d["Payment_Date"].notna() & d["Payment_Amnt"].gt(0), 0.0)
 
-    # Semua nilai penjualan dan COGS adalah PER PRODUK, bukan per invoice.
+    # Semua nilai penjualan dan COGM adalah PER PRODUK, bukan per invoice.
 
     # Payment_Amnt juga dicatat/dialokasikan PER PRODUK; jangan deduplikasi pembayaran.
 
-    # Gross profit adalah penjualan tanpa PPN dikurangi Total COGS.
+    # Gross profit adalah penjualan tanpa PPN dikurangi Total COGM.
 
     # Kolom ini harus dibuat sebelum digunakan untuk menghitung Margin Collection.
 
     d["Gross_Profit"] = (
 
-        d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGS"]
+        d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGM"]
 
     )
 
     # Gross margin dihitung dari penjualan TANPA PPN karena PPN bukan pendapatan.
 
-    # Margin_Ratio = (Net Sales Excl PPN - Total COGS) / Net Sales Excl PPN.
+    # Margin_Ratio = (Net Sales Excl PPN - Total COGM) / Net Sales Excl PPN.
 
     d["Margin_Valid"] = (
 
         d["Net_Sales_Amnt_Excl_Ppn"].gt(0)
 
-        & d["Total_COGS"].ge(0)
+        & d["Total_COGM"].ge(0)
 
     )
 
@@ -225,11 +225,11 @@ def prepare(source):
 
     denom_excl_ppn = d["Net_Sales_Amnt_Excl_Ppn"].where(d["Margin_Valid"])
 
-    d["Cost_Ratio"] = (d["Total_COGS"] / denom_excl_ppn).fillna(0.0)
+    d["Cost_Ratio"] = (d["Total_COGM"] / denom_excl_ppn).fillna(0.0)
 
     d["Margin_Ratio"] = (
 
-        (d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGS"]) / denom_excl_ppn
+        (d["Net_Sales_Amnt_Excl_Ppn"] - d["Total_COGM"]) / denom_excl_ppn
 
     ).fillna(0.0)
 
@@ -283,9 +283,9 @@ def prepare(source):
 
     d["Margin_Pembayaran"] = d["Gross_Profit"] * d["Collection_Ratio"]
 
-    # Estimasi COGS dan PPN yang terealisasi mengikuti proporsi pembayaran.
+    # Estimasi COGM dan PPN yang terealisasi mengikuti proporsi pembayaran.
 
-    d["COGS_Pembayaran"] = d["Total_COGS"] * d["Collection_Ratio"]
+    d["COGM_Pembayaran"] = d["Total_COGM"] * d["Collection_Ratio"]
 
     d["PPN_Pembayaran"] = d["Pembayaran"] * (1 - d["Sales_Ratio"])
 
@@ -457,7 +457,7 @@ def create_summary_pdf(table, period, totals, filters):
 
         Paragraph("Catatan: jatuh tempo dihitung dari Balance terkini untuk invoice dengan Jth_Tempo sampai akhir periode. "
 
-                  "Collection mengikuti Payment_Date bulan terpilih. Margin Collection = Gross Profit produk (penjualan tanpa PPN dikurangi COGS) dikalikan rasio pembayaran terhadap penjualan termasuk PPN, maksimal 100%. Jika invoice lunas, Margin Collection sama dengan Gross Profit. PPN tidak menjadi pendapatan.", style_small),
+                  "Collection mengikuti Payment_Date bulan terpilih. Margin Collection = Gross Profit produk (penjualan tanpa PPN dikurangi COGM) dikalikan rasio pembayaran terhadap penjualan termasuk PPN, maksimal 100%. Jika invoice lunas, Margin Collection sama dengan Gross Profit. PPN tidak menjadi pendapatan.", style_small),
 
     ])
 
@@ -624,7 +624,7 @@ filtered["Collection_Bulan"] = filtered["Pembayaran"].where(filtered["Payment_Da
 
 filtered["Margin_Bulan"] = filtered["Margin_Pembayaran"].where(filtered["Payment_Date"].between(start, end) & filtered["Margin_Valid"].fillna(False), 0.0)
 
-filtered["COGS_Bulan"] = filtered["COGS_Pembayaran"].where(filtered["Payment_Date"].between(start, end), 0.0)
+filtered["COGM_Bulan"] = filtered["COGM_Pembayaran"].where(filtered["Payment_Date"].between(start, end), 0.0)
 
 filtered["PPN_Bulan"] = filtered["PPN_Pembayaran"].where(filtered["Payment_Date"].between(start, end), 0.0)
 
@@ -826,7 +826,7 @@ def bentuk_tabel_invoice(rows, pembayaran_only=False):
 
             Ppn=("Ppn", "sum"),
 
-            Total_COGS=("Total_COGS", "sum"),
+            Total_COGM=("Total_COGM", "sum"),
 
             Balance=("Outstanding", "sum"),
 
@@ -902,7 +902,7 @@ def tampilkan_invoice(data, sort_cols, ascending):
 
         "Margin_Collection": "Margin Collection",
 
-        "Total_COGS": "Total COGS",
+        "Total_COGM": "Total COGM",
 
         "Balance": "Balance",
 
@@ -912,7 +912,7 @@ def tampilkan_invoice(data, sort_cols, ascending):
 
         display[col] = pd.to_datetime(display[col], errors="coerce").dt.strftime("%d-%m-%Y").fillna("—")
 
-    for col in ["Total Amount", "PPN", "Payment Amount", "Total COGS", "Margin Collection", "Balance"]:
+    for col in ["Total Amount", "PPN", "Payment Amount", "Total COGM", "Margin Collection", "Balance"]:
 
         if col in display.columns:
 
@@ -932,9 +932,9 @@ def tampilkan_invoice(data, sort_cols, ascending):
 
     # Kolom ini hanya tersedia pada tabel Collection Customer.
 
-    if "Total COGS" in display.columns:
+    if "Total COGM" in display.columns:
 
-        output_cols.append("Total COGS")
+        output_cols.append("Total COGM")
 
     if "Margin Collection" in display.columns:
 

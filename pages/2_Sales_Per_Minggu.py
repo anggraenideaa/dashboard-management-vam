@@ -4,10 +4,7 @@ from db import load_sales_report
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-
 st.set_page_config(page_title="Sales Performance Dashboard", layout="wide")
-
-
 # Fungsi untuk memuat file CSS eksternal (terpusat) & CSS Responsif Tabel
 def load_css(file_name):
     try:
@@ -17,10 +14,7 @@ def load_css(file_name):
         st.error(
             f"File CSS '{file_name}' tidak ditemukan. Pastikan folder 'assets' dan file 'style.css' sudah dibuat."
         )
-
-
 load_css("assets/style.css")
-
 # CSS tambahan untuk memaksa responsivitas mobile
 st.markdown(
     """
@@ -35,8 +29,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-
 # Fungsi untuk memformat angka ke standar Indonesia (titik=ribuan, koma=desimal, 2 digit desimal)
 def format_id(val, decimal=2):
     try:
@@ -50,17 +42,12 @@ def format_id(val, decimal=2):
         return formatted
     except Exception:
         return val
-
-
 st.title("📊 Sales Performance Dashboard")
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-
 # Tentukan Role Pengguna
 user_role = str(st.session_state.get("role", "sales")).lower()
-
 # Load Data dari db.py
 df = load_sales_report()
-
 if df is None:
     st.error(
         "Fungsi `load_sales_report()` mengembalikan nilai `None`. Periksa koneksi database/Google Sheets Anda."
@@ -72,16 +59,13 @@ elif df.empty:
 else:
     # 1. BERSIHKAN NAMA KOLOM DARI SPASI TERSEMBUNYI
     df.columns = df.columns.astype(str).str.strip()
-
     # --- 1.1 FILTER TANGGAL BERDASARKAN Tgl_Inv (MINGGUAN DEFAULT) ---
     col_tgl_inv = "Tgl_Inv"
     if col_tgl_inv in df.columns:
         df[col_tgl_inv] = pd.to_datetime(df[col_tgl_inv], errors="coerce")
-
         # Rentang tanggal mingguan default
         start_date = pd.to_datetime("2026-11-07")
         end_date = pd.to_datetime("2026-11-13")
-
         df = df[
             (df[col_tgl_inv] >= start_date) & (df[col_tgl_inv] <= end_date)
         ]
@@ -89,7 +73,6 @@ else:
         st.warning(
             f"Kolom tanggal invoice ('{col_tgl_inv}') tidak ditemukan pada data. Filter tanggal mingguan dilewati."
         )
-
     if df.empty:
         st.warning(
             "Tidak ada data sales yang ditemukan pada rentang tanggal tersebut (07 November - 13 November 2026)."
@@ -97,7 +80,6 @@ else:
     else:
         # 2. PEMBERSIHAN DATA NET SALES
         if "Net_Sales_Amnt_Excl_Ppn" in df.columns:
-
             def clean_to_decimal(val):
                 try:
                     if pd.isna(val):
@@ -115,7 +97,6 @@ else:
                     return Decimal(s)
                 except Exception:
                     return Decimal("0")
-
             df["Net_Sales_Amnt_Excl_Ppn_Dec"] = df[
                 "Net_Sales_Amnt_Excl_Ppn"
             ].apply(clean_to_decimal)
@@ -125,7 +106,6 @@ else:
         else:
             df["Net_Sales_Amnt_Excl_Ppn_Dec"] = Decimal("0")
             df["Net_Sales_Amnt_Excl_Ppn"] = 0.0
-
         # 3. PEMBERSIHAN KOLOM NUMERIK LAINNYA
         other_numeric_cols = ["Total_COGM", "Total_COGS", "Tot_Qty_Kg", "Target"]
         for col in other_numeric_cols:
@@ -146,7 +126,6 @@ else:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
             else:
                 df[col] = 0
-
         # Simpan versi Decimal untuk COGM & COGS agar akurat
         for c_col in ["Total_COGM", "Total_COGS"]:
             if c_col in df.columns:
@@ -155,7 +134,6 @@ else:
                 )
             else:
                 df[f"{c_col}_Dec"] = Decimal("0")
-
         if "Sales_Name" in df.columns:
             df["Sales_Name"] = (
                 df["Sales_Name"]
@@ -164,7 +142,6 @@ else:
                 .str.strip()
                 .str.upper()
             )
-
         # Pembatasan Akses Sales
         if user_role == "sales":
             if "nama_sales" in st.session_state:
@@ -172,7 +149,6 @@ else:
                     df["Sales_Name"]
                     == str(st.session_state.nama_sales).strip().upper()
                 ]
-
         # 4. DETEKSI DAN EKSTRAKSI PERIODE
         if "Periode" in df.columns:
             df["Periode_Bulan"] = df["Periode"].astype(str).str.strip()
@@ -189,7 +165,6 @@ else:
                 )
             else:
                 df["Periode_Bulan"] = "2026-10"
-
         # TENTUKAN KOLOM BIAYA UTAMA (METRIK) BERDASARKAN ROLE
         if user_role in ["admin", "direksi"]:
             active_cost_col = "Total_COGM"
@@ -199,17 +174,14 @@ else:
             active_cost_col = "Total_COGS"
             active_cost_dec_col = "Total_COGS_Dec"
             cost_label = "COGS"
-
         df[f"Net_Margin_{cost_label}"] = (
             df["Net_Sales_Amnt_Excl_Ppn"] - df[active_cost_col]
         ).round(2)
-
         # ==========================================
         # FILTER UTAMA (DEFAULT TERTUTUP / COLLAPSED)
         # ==========================================
         with st.expander("🔍 Filter Data Dashboard", expanded=False):
             f_col1, f_col2 = st.columns(2)
-
             if "Branch" in df.columns:
                 all_branches = sorted(
                     df["Branch"].dropna().astype(str).unique().tolist()
@@ -223,7 +195,6 @@ else:
                     )
                 if selected_branches:
                     df = df[df["Branch"].isin(selected_branches)]
-
             if "Sales_Name" in df.columns and user_role in ["admin", "direksi"]:
                 all_sales = sorted(df["Sales_Name"].dropna().unique().tolist())
                 with f_col2:
@@ -235,9 +206,7 @@ else:
                     )
                 if selected_sales:
                     df = df[df["Sales_Name"].isin(selected_sales)]
-
             f_col3, f_col4 = st.columns(2)
-
             if "Cust_Name" in df.columns:
                 all_cust = sorted(
                     df["Cust_Name"].dropna().astype(str).unique().tolist()
@@ -251,7 +220,6 @@ else:
                     )
                 if selected_cust:
                     df = df[df["Cust_Name"].isin(selected_cust)]
-
             if "Periode_Bulan" in df.columns:
                 all_periode = sorted(
                     df["Periode_Bulan"].dropna().unique().tolist()
@@ -265,30 +233,25 @@ else:
                     )
                 if selected_periode:
                     df = df[df["Periode_Bulan"].isin(selected_periode)]
-
         st.caption(
             f"ℹ️ Total baris data dimuat (Periode Tgl_Inv 07 November - 13 November 2026): **{format_id(len(df), 0)} baris**"
         )
         st.markdown(
             "<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True
         )
-
         # 5. KARTU METRIK UTAMA
         total_net_sales = df["Net_Sales_Amnt_Excl_Ppn"].sum()
         total_cost = df[active_cost_col].sum()
         total_net_margin = df[f"Net_Margin_{cost_label}"].sum()
-
         m1, m2, m3 = st.columns(3)
         m1.metric("💰 Net Sales Excl PPN", f"Rp {format_id(total_net_sales, 2)}")
         m2.metric(f"📦 Total {cost_label}", f"Rp {format_id(total_cost, 2)}")
         m3.metric(
             f"📈 Net Margin {cost_label}", f"Rp {format_id(total_net_margin, 2)}"
         )
-
         st.markdown(
             "<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True
         )
-
         # 6. TABEL RINGKASAN PERFORMA PER SALES (RESPONSIF / NOWRAP MENGGUNAKAN HTML NATIVE)
         if "Sales_Name" in df.columns and not df.empty:
             df_target_per_bulan = (
@@ -301,7 +264,6 @@ else:
                 .sum()
                 .reset_index()
             )
-
             df_sales_agg = (
                 df.groupby("Sales_Name")
                 .agg(
@@ -313,14 +275,12 @@ else:
                 )
                 .reset_index()
             )
-
             df_summary = pd.merge(
                 df_sales_agg, df_total_target, on="Sales_Name", how="left"
             ).fillna(0)
             df_summary = df_summary.sort_values(
                 by="Net_Sales_Amnt_Excl_Ppn", ascending=False
             )
-
             if user_role in ["admin", "direksi"]:
                 df_summary["Gross_Margin_COGM"] = (
                     df_summary["Net_Sales_Amnt_Excl_Ppn"]
@@ -339,7 +299,6 @@ else:
                     else 0,
                     axis=1,
                 )
-
             df_summary["Gross_Margin_COGS"] = (
                 df_summary["Net_Sales_Amnt_Excl_Ppn"] - df_summary["Total_COGS"]
             )
@@ -353,35 +312,28 @@ else:
                 else 0,
                 axis=1,
             )
-
             # Buat baris data tabel secara aman
             rows_list = []
             for idx, row in enumerate(df_summary.iterrows(), start=1):
                 r = row[1]
                 s_name = str(r["Sales_Name"])
                 net_sales = f"Rp {format_id(r['Net_Sales_Amnt_Excl_Ppn'], 2)}"
-
                 extra_tds = ""
                 if user_role in ["admin", "direksi"]:
                     g_cogm = f"Rp {format_id(r['Gross_Margin_COGM'], 2)}"
                     n_cogm = f"{format_id(r['Net_Margin_COGM (%)'], 2)}%"
                     extra_tds += f"<td style='text-align: right;'>{g_cogm}</td><td style='text-align: center;'>{n_cogm}</td>"
-
                 g_cogs = f"Rp {format_id(r['Gross_Margin_COGS'], 2)}"
                 n_cogs = f"{format_id(r['Net_Margin_COGS (%)'], 2)}%"
                 extra_tds += f"<td style='text-align: right;'>{g_cogs}</td><td style='text-align: center;'>{n_cogs}</td>"
-
                 row_html = f"<tr><td style='text-align: center;'>{idx}</td><td style='text-align: left;'>{s_name}</td><td style='text-align: right;'>{net_sales}</td>{extra_tds}</tr>"
                 rows_list.append(row_html)
-
             rows_html_str = "".join(rows_list)
-
             # Buat header tabel secara aman
             if user_role in ["admin", "direksi"]:
                 header_extra = "<th>Gross Margin COGM</th><th>Net Margin COGM (%)</th><th>Gross Margin COGS</th><th>Net Margin COGS (%)</th>"
             else:
                 header_extra = "<th>Gross Margin COGS</th><th>Net Margin COGS (%)</th>"
-
             # Render HTML lengkap dengan nowrap agar rapi dan bisa scroll horizontal
             table_responsive_html = f"""
             <div style="width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid #e6e6e6;">
@@ -427,15 +379,12 @@ else:
                 </table>
             </div>
             """
-
             with st.container(border=True):
                 st.subheader("📋 Ringkasan Performa Per Sales")
-                st.markdown(table_responsive_html, unsafe_allow_html=True)
-
+                st.markdown("\n".join(line.lstrip() for line in table_responsive_html.splitlines() if line.strip()), unsafe_allow_html=True)
         st.markdown(
             "<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True
         )
-
         # 7. GRAFIK PENCAPAIAN SALES VS TARGET (SUMBU Y TANPA DESIMAL, TOOLTIP DENGAN DESIMAL)
         if "Sales_Name" in df.columns and not df.empty:
             df_t1 = (
@@ -446,7 +395,6 @@ else:
             df_target_final = (
                 df_t1.groupby("Sales_Name")["Target"].sum().reset_index()
             )
-
             df_sales_val = (
                 df.groupby("Sales_Name")["Net_Sales_Amnt_Excl_Ppn"]
                 .sum()
@@ -455,18 +403,15 @@ else:
             df_target = pd.merge(
                 df_sales_val, df_target_final, on="Sales_Name", how="left"
             ).fillna(0)
-
             df_target = df_target.sort_values(
                 by="Net_Sales_Amnt_Excl_Ppn", ascending=False
             )
             sales_order = df_target["Sales_Name"].tolist()
-
             # Konversi nilai ke dalam satuan Juta (M) untuk sumbu Y
             df_target["Target_in_M"] = df_target["Target"] / 1_000_000
             df_target["Sales_in_M"] = (
                 df_target["Net_Sales_Amnt_Excl_Ppn"] / 1_000_000
             )
-
             df_melted = df_target.melt(
                 id_vars="Sales_Name",
                 value_vars=["Target_in_M", "Sales_in_M"],
@@ -476,7 +421,6 @@ else:
             df_melted["Kategori"] = df_melted["Kategori"].replace(
                 {"Target_in_M": "Target", "Sales_in_M": "Net Sales"}
             )
-
             df_melted["Nominal_Asli"] = df_melted.apply(
                 lambda row: (
                     df_target.loc[
@@ -493,7 +437,6 @@ else:
             df_melted["Formatted_Nominal"] = df_melted["Nominal_Asli"].apply(
                 lambda x: format_id(x, 2)
             )
-
             fig_target = px.bar(
                 df_melted,
                 x="Sales_Name",
@@ -511,16 +454,13 @@ else:
                 text="Formatted_Nominal",
                 custom_data=["Formatted_Nominal"],
             )
-
             fig_target.update_traces(
                 texttemplate="Rp %{text}",
                 textposition="outside",
                 textangle=-90,
                 hovertemplate="<b>%{x}</b><br>%{legendgroup}: Rp %{customdata[0]}<extra></extra>",
             )
-
             num_sales = len(sales_order)
-
             fig_target.update_layout(
                 height=480,
                 font=dict(family="sans-serif", size=11, color="#333333"),
@@ -556,7 +496,6 @@ else:
                     ticksuffix=" M",
                 ),
             )
-
             with st.container(border=True):
                 st.subheader("🎯 Pencapaian Sales vs Target (Mingguan)")
                 st.plotly_chart(
@@ -564,10 +503,8 @@ else:
                     use_container_width=True,
                     config={"displayModeBar": False},
                 )
-
         # 8. 10 PRODUK TERATAS & 10 CUSTOMER TERTINGGI (SUMBU Y TANPA DESIMAL)
         c1, c2 = st.columns(2)
-
         with c1:
             item_col = (
                 "KeyItem"
@@ -576,7 +513,6 @@ else:
                     "Item_Name_Vam" if "Item_Name_Vam" in df.columns else None
                 )
             )
-
             if item_col:
                 top_products = (
                     df.groupby(item_col)["Tot_Qty_Kg"].sum().reset_index()
@@ -587,7 +523,6 @@ else:
                 top_products["Formatted_Qty"] = top_products[
                     "Tot_Qty_Kg"
                 ].apply(lambda x: format_id(x, 2))
-
                 fig_prod = px.bar(
                     top_products,
                     x=item_col,
@@ -629,7 +564,6 @@ else:
                     margin=dict(l=10, r=10, t=20, b=90),
                     coloraxis_showscale=False,
                 )
-
                 with st.container(border=True):
                     st.subheader("🔥 10 Produk Teratas (Best Seller)")
                     st.plotly_chart(
@@ -641,7 +575,6 @@ else:
                 st.warning(
                     "Kolom produk ('KeyItem' atau 'Item_Name_Vam') tidak ditemukan."
                 )
-
         with c2:
             if "Cust_Name" in df.columns:
                 top_cust = (
@@ -652,7 +585,6 @@ else:
                 top_cust = top_cust.sort_values(
                     by="Net_Sales_Amnt_Excl_Ppn", ascending=False
                 ).head(10)
-
                 # Konversi nilai ke dalam satuan Juta (M) untuk sumbu Y
                 top_cust["Sales_in_M"] = (
                     top_cust["Net_Sales_Amnt_Excl_Ppn"] / 1_000_000
@@ -660,7 +592,6 @@ else:
                 top_cust["Formatted_Sales"] = top_cust[
                     "Net_Sales_Amnt_Excl_Ppn"
                 ].apply(lambda x: format_id(x, 2))
-
                 fig_cust = px.bar(
                     top_cust,
                     x="Cust_Name",
@@ -705,7 +636,6 @@ else:
                     margin=dict(l=10, r=10, t=20, b=90),
                     coloraxis_showscale=False,
                 )
-
                 with st.container(border=True):
                     st.subheader("👑 10 Customer Pembelian Tertinggi")
                     st.plotly_chart(
@@ -715,7 +645,47 @@ else:
                     )
             else:
                 st.warning("Kolom 'Cust_Name' tidak ditemukan.")
-
+        # TABEL TAMBAHAN CUSTOMER & NET SALES (MENGIKUTI FILTER DASHBOARD)
+        if "Cust_Name" in df.columns:
+            df_customer_sales = df.copy()
+            df_customer_sales["Cust_Name"] = (
+                df_customer_sales["Cust_Name"]
+                .fillna("UNKNOWN CUST")
+                .astype(str)
+                .str.strip()
+            )
+            df_customer_sales = df_customer_sales[
+                (df_customer_sales["Cust_Name"] != "")
+                & (df_customer_sales["Cust_Name"].str.lower() != "nan")
+            ]
+            df_customer_sales = (
+                df_customer_sales.groupby("Cust_Name", as_index=False)["Net_Sales_Amnt_Excl_Ppn_Dec"]
+                .agg(lambda values: sum(values, Decimal("0")))
+                .sort_values("Net_Sales_Amnt_Excl_Ppn_Dec", ascending=False)
+                .reset_index(drop=True)
+            )
+            customer_table = pd.DataFrame({
+                "No": range(1, len(df_customer_sales) + 1),
+                "Customer Name": df_customer_sales["Cust_Name"],
+                "Net Sales Excl PPN (Rp)": df_customer_sales["Net_Sales_Amnt_Excl_Ppn_Dec"].apply(
+                    lambda value: f"Rp {format_id(value, 2)}"
+                ),
+            })
+            with st.container(border=True):
+                st.subheader("📋 Net Sales per Customer")
+                st.dataframe(
+                    customer_table,
+                    hide_index=True,
+                    use_container_width=True,
+                    height=min(430, 38 * (len(customer_table) + 1) + 5),
+                )
+                total_customer_sales = sum(
+                    df_customer_sales["Net_Sales_Amnt_Excl_Ppn_Dec"], Decimal("0")
+                )
+                st.caption(
+                    f"Total {format_id(len(customer_table), 0)} customer | "
+                    f"Net Sales: Rp {format_id(total_customer_sales, 2)}"
+                )
         # 9. TOTAL PENJUALAN PER CABANG
         if "Branch" in df.columns:
             df_branch = (
@@ -729,7 +699,6 @@ else:
             df_branch["Formatted_Sales"] = df_branch[
                 "Net_Sales_Amnt_Excl_Ppn"
             ].apply(lambda x: format_id(x, 2))
-
             fig_branch = px.pie(
                 df_branch,
                 names="Branch",
@@ -759,7 +728,6 @@ else:
                     font=dict(size=10),
                 ),
             )
-
             with st.container(border=True):
                 st.subheader("🏢 Total Penjualan per Cabang")
                 st.plotly_chart(

@@ -1,138 +1,231 @@
-/* --- Styling Global / Container --- */
+/* =========================================================
+   DASHBOARD MANAGEMENT — STREAMLIT STYLESHEET
+   Simpan sebagai: assets/style.css
+   ========================================================= */
+
+/* ---------- TOKENS ---------- */
+:root {
+    --dash-bg: #ffffff;
+    --dash-sidebar: #f8fafc;
+    --dash-ink: #1e293b;
+    --dash-muted: #64748b;
+    --dash-primary: #0f172a;
+    --dash-primary-hover: #1e293b;
+    --dash-border: #e2e8f0;
+    --dash-danger: #ef4444;
+    --dash-danger-hover: #dc2626;
+    --dash-radius: 12px;
+}
+
+/* ---------- HALAMAN UTAMA ---------- */
+.stApp {
+    background-color: var(--dash-bg) !important;
+    background-image: none !important;
+}
+
 .block-container {
     padding-top: 1.2rem !important;
     padding-bottom: 2rem !important;
 }
 
-/* Judul Utama Dashboard */
 h1 {
     font-size: 1.8rem !important;
     font-weight: 700 !important;
-    color: #1E293B;
-    margin-bottom: 0px !important;
+    color: var(--dash-ink) !important;
+    margin-bottom: 0 !important;
 }
 
-/* --- Helper Spacers (Pengganti Inline HTML) --- */
-.spacer-5 {
-    margin-bottom: 5px !important;
-}
-.spacer-10 {
-    margin-bottom: 10px !important;
-}
-.spacer-15 {
-    margin-bottom: 15px !important;
-}
+.spacer-5  { margin-bottom: 5px !important; }
+.spacer-10 { margin-bottom: 10px !important; }
+.spacer-15 { margin-bottom: 15px !important; }
 
-/* --- Styling untuk Metrik Card (Neumorphism / Soft Shadow) --- */
-div[data-testid="stMetric"] {
-    background-color: #ffffff;
-    border: 1px solid #f0f0f0;
-    padding: 20px;
-    border-radius: 20px;
-    box-shadow: 8px 8px 16px #e0e0e0, -8px -8px 16px #ffffff;
-    transition: all 0.4s ease;
-}
-div[data-testid="stMetric"]:hover {
-    transform: scale(1.02);
-    box-shadow: 12px 12px 24px #d1d1d1, -12px -12px 24px #ffffff;
-}
-div[data-testid="stMetricValue"] {
-    font-size: 1.5rem !important;
-    font-weight: 700;
-}
-
-/* --- EFEK TIMBUL & HOVER PADA CONTAINER GRAFIK & TABEL (border=True) --- */
-div[data-testid="stVerticalBlockBorderWrapper"] {
-    background-color: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 25px !important;
-    padding: 10px !important;
-    margin-bottom: 20px !important;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08), 0 6px 12px rgba(0, 0, 0, 0.04) !important;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    transform: translateY(-8px) !important;
-    box-shadow: 0 22px 40px rgba(0, 0, 0, 0.14), 0 12px 18px rgba(0, 0, 0, 0.08) !important;
-    border-color: #cbd5e1 !important;
-}
-
-/* --- MENYAMAKAN FONT JUDUL DI DALAM CARD AGAR SERAGAM --- */
-div[data-testid="stVerticalBlockBorderWrapper"] h3, 
-div[data-testid="stVerticalBlockBorderWrapper"] h2 {
-    font-size: 1.25rem !important;
-    font-weight: 700 !important;
-    color: #1E293B !important;
-    letter-spacing: -0.01em;
-    margin-bottom: 0.5rem !important;
-}
-
-/* --- CSS TABEL BAWAAN STREAMLIT (st.dataframe) --- */
-[data-testid="stDataFrame"] {
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.05);
-}
-
-[data-testid="stDataFrame"] tr:hover {
-    background-color: #e8f5e9 !important;
-    transition: background-color 0.2s ease;
-}
-
-/* --- MEMAKSA HEADER TABEL AGAR BENAR-BENAR DI TENGAH (CENTER) --- */
-[data-testid="stDataFrame"] [data-testid="column-header"],
-[data-testid="stDataFrame"] th,
-[data-testid="stDataFrame"] [role="columnheader"] {
-    text-align: center !important;
-    justify-content: center !important;
-    align-items: center !important;
-}
-
-[data-testid="stDataFrame"] [data-testid="column-header"] > div,
-[data-testid="stDataFrame"] th > div {
-    justify-content: center !important;
-    text-align: center !important;
-    width: 100% !important;
-}
-
-[data-testid="stDataFrame"] span {
-    text-align: center !important;
-    width: 100% !important;
-}
-
-/* --- STYLING SIDEBAR & WARNA --- */
+/* ---------- SIDEBAR ---------- */
 [data-testid="stSidebar"] {
-    background-color: #f8fafc !important;
-    border-right: 1px solid #e2e8f0 !important;
+    background-color: var(--dash-sidebar) !important;
+    border-right: 1px solid var(--dash-border) !important;
 }
 
-/* --- STYLING MENU NAVIGASI SIDEBAR --- */
-[data-testid="stSidebarNav"] a {
-    border-radius: 10px !important;
-    padding: 8px 12px !important;
+/* Jangan paksa height/position/overflow sidebar: Streamlit perlu
+   mengatur scroll dan layout-nya sendiri saat navigasi berubah. */
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 9px 12px !important;
     margin-bottom: 4px !important;
-    transition: all 0.2s ease-in-out !important;
+    border-radius: 10px !important;
+    text-decoration: none !important;
+    transition: background-color 0.18s ease, color 0.18s ease !important;
 }
-[data-testid="stSidebarNav"] a:hover {
-    background-color: #f1f5f9 !important;
+
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
+    background-color: #e9eef5 !important;
 }
-[data-testid="stSidebarNav"] a[aria-current="page"] {
-    background-color: #0f172a !important;
+
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {
+    background-color: var(--dash-primary) !important;
     color: #ffffff !important;
     font-weight: 600 !important;
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
-[data-testid="stSidebarNav"] a[aria-current="page"] span {
+
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] * {
     color: #ffffff !important;
 }
 
-/* --- STYLING HALAMAN UTAMA MENJADI PUTIH BERSIH --- */
-.stApp {
-    background-color: #ffffff !important;
-    background-image: none !important;
+/* Garis pembatas hanya di sidebar */
+[data-testid="stSidebar"] hr {
+    border-color: var(--dash-border) !important;
 }
 
-/* --- STYLING HALAMAN LOGIN --- */
+/* ---------- TOMBOL ---------- */
+.stButton > button,
+.stFormSubmitButton > button {
+    background-color: var(--dash-primary) !important;
+    color: #ffffff !important;
+    border: 1px solid transparent !important;
+    border-radius: var(--dash-radius) !important;
+    font-weight: 600 !important;
+    padding: 0.6rem 0.85rem !important;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.stButton > button:hover,
+.stFormSubmitButton > button:hover {
+    background-color: var(--dash-primary-hover) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18) !important;
+}
+
+.stButton > button:focus-visible,
+.stFormSubmitButton > button:focus-visible {
+    outline: 2px solid #94a3b8 !important;
+    outline-offset: 2px !important;
+}
+
+/* HANYA tombol dengan key="logout_button" pada app.py.
+   Tidak lagi mewarnai semua tombol secondary menjadi merah. */
+[data-testid="stSidebar"] .st-key-logout_button button {
+    background-color: var(--dash-danger) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+
+[data-testid="stSidebar"] .st-key-logout_button button:hover {
+    background-color: var(--dash-danger-hover) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.24) !important;
+}
+
+/* ---------- KARTU METRIK ---------- */
+div[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #f0f0f0;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 8px 8px 16px #e0e0e0, -8px -8px 16px #ffffff;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-3px);
+    box-shadow: 8px 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+div[data-testid="stMetricValue"] {
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+}
+
+/* ---------- CARD GRAFIK / TABEL (st.container(border=True)) ---------- */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff !important;
+    border: 1px solid var(--dash-border) !important;
+    border-radius: 20px !important;
+    padding: 10px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06),
+                0 6px 12px rgba(0, 0, 0, 0.03) !important;
+    transition: box-shadow 0.25s ease, border-color 0.25s ease !important;
+}
+
+/* Hindari translateY card: perubahan posisi saat hover dapat
+   menimbulkan clipping dan pergeseran pada container berscroll. */
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.10) !important;
+    border-color: #cbd5e1 !important;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"] h2,
+div[data-testid="stVerticalBlockBorderWrapper"] h3 {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: var(--dash-ink) !important;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5rem !important;
+}
+
+/* ---------- st.dataframe ---------- */
+[data-testid="stDataFrame"] {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* Header st.dataframe dirender dengan grid/canvas pada beberapa
+   versi Streamlit. Hindari selector span global dan iframe width,
+   karena bisa merusak ukuran cell/kolom. */
+[data-testid="stDataFrame"] [role="columnheader"] {
+    text-align: center !important;
+    justify-content: center !important;
+}
+
+/* ---------- TABEL HTML CUSTOM ---------- */
+.mobile-table-container {
+    position: relative;
+    width: 100%;
+    max-height: 520px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+}
+
+.mobile-table-container table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: inherit;
+}
+
+.mobile-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.02em;
+    border-bottom: 2px solid #cbd5e1 !important;
+    padding: 12px 14px !important;
+    text-align: center !important;
+    white-space: nowrap;
+}
+
+.mobile-table-container tbody td {
+    padding: 11px 14px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    color: var(--dash-ink) !important;
+    background-color: #ffffff !important;
+    font-size: 0.9rem !important;
+    overflow-wrap: anywhere;
+}
+
+.mobile-table-container tbody tr:hover td {
+    background-color: #f8fafc !important;
+}
+
+/* ---------- FORM LOGIN ---------- */
 .login-container {
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
 }
@@ -141,120 +234,71 @@ div[data-testid="stVerticalBlockBorderWrapper"] h2 {
     background: #ffffff !important;
     padding: 40px !important;
     border-radius: 25px !important;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05),
+                0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
     border: 1px solid #f1f5f9 !important;
     margin-top: 6vh !important;
 }
 
-/* Tombol Umum / Login */
-.stButton button {
-    background: #0f172a !important;
-    color: white !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
-    padding: 10px !important;
-    transition: all 0.3s ease;
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 768px) {
+    .block-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 1rem !important;
+    }
+
+    h1 { font-size: 1.5rem !important; }
+
+    [data-testid="stForm"] {
+        padding: 20px !important;
+        margin-top: 2vh !important;
+    }
+
+    div[data-testid="stMetric"] {
+        padding: 14px;
+        border-radius: 14px;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 14px !important;
+        padding: 8px !important;
+    }
+
+    .mobile-table-container thead th,
+    .mobile-table-container tbody td {
+        padding: 8px 10px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* Jangan paksa .row-widget.stHorizontal menjadi column:
+       dapat merusak st.columns dan widget responsif Streamlit. */
 }
 
-.stButton button:hover {
-    background: #1e293b !important;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+@media (prefers-reduced-motion: reduce) {
+    div[data-testid="stMetric"],
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+        transition: none !important;
+    }
 }
 
-/* Tombol khusus LOGOUT (Warna Merah) */
-button[kind="secondary"] {
+/* Prioritas tertinggi untuk Logout, tanpa memengaruhi tombol lainnya. */
+[data-testid="stSidebar"] .st-key-logout_button button,
+[data-testid="stSidebar"] [class*="st-key-logout_button"] button {
+    background: #ef4444 !important;
     background-color: #ef4444 !important;
-    color: white !important;
+    color: #ffffff !important;
     border: none !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
 }
-
-button[kind="secondary"]:hover {
+[data-testid="stSidebar"] .st-key-logout_button button:hover,
+[data-testid="stSidebar"] [class*="st-key-logout_button"] button:hover {
+    background: #dc2626 !important;
     background-color: #dc2626 !important;
+    color: #ffffff !important;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
 }
-
-/* =========================================================================
-   --- STYLING TABEL STICKY HEADER, SCROLL & ANTI-TERPOTONG (SCROLLBAR AMAN) ---
-   ========================================================================= */
-.mobile-table-container {
-    width: 100%;
-    max-height: 520px;
-    overflow-y: auto !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    position: relative;
-    border-radius: 12px;
-    padding-right: 8px; /* Mencegah scrollbar menutupi teks kolom paling kanan */
-}
-
-.mobile-table-container table {
-    width: 100% !important;
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-    font-family: sans-serif;
-}
-
-/* Header Tabel Sticky dengan Warna Elegan & Rapi */
-.mobile-table-container th,
-.mobile-table-container table tr:first-child th,
-.mobile-table-container thead th {
-    background-color: #f1f5f9 !important;
-    color: #334155 !important;
-    font-weight: 700 !important;
-    font-size: 0.85rem !important;
-    letter-spacing: 0.03em !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 99 !important;
-    border-bottom: 2px solid #cbd5e1 !important;
-    padding: 12px 14px !important;
-    text-align: center !important;
-}
-
-/* Sel / Baris Tabel */
-.mobile-table-container td {
-    padding: 11px 14px !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    color: #1e293b !important;
-    background-color: #ffffff !important;
-    font-size: 0.9rem !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-}
-
-/* Efek Hover Baris */
-.mobile-table-container tbody tr:hover td {
-    background-color: #f8fafc !important;
-}
-
-@media (max-width: 768px) {
-    .mobile-table-container table {
-        font-size: 11px !important;
-    }
-    .mobile-table-container th, 
-    .mobile-table-container td {
-        padding: 8px 10px !important;
-    }
-}
-
-[data-testid="stDataFrame"] div[data-testid="stTable"] {
-    width: 100% !important;
-}
-[data-testid="stDataFrame"] iframe {
-    width: 100% !important;
-}
-
-/* Membuat container dan card lebih ramah mobile */
-@media (max-width: 768px) {
-    /* Mengubah multi-kolom agar bertumpuk di HP */
-    .row-widget.stHorizontal {
-        flex-direction: column;
-    }
-    /* Mengatur padding dashboard agar tidak terlalu mepet */
-    .block-container {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
+[data-testid="stSidebar"] .st-key-logout_button button:focus,
+[data-testid="stSidebar"] .st-key-logout_button button:active {
+    color: #ffffff !important;
 }
